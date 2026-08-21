@@ -1,0 +1,281 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model admins {
+  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email         String       @unique
+  password_hash String
+  role          String       @default("admin")
+  username      String?
+  profile_image String?
+  created_at    DateTime     @default(now())
+  updated_at    DateTime     @updatedAt
+
+  admin_logs           admin_logs[]
+  deposits_approved    deposits[]    @relation("ApprovedDeposits")
+  withdrawals_processed withdrawals[] @relation("ProcessedWithdrawals")
+
+  @@map("admins")
+}
+
+model users {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                String    @unique
+  password_hash        String
+  withdrawal_pin       String?
+  full_name            String
+  username             String?   @unique
+  profile_image        String?
+  balance              Decimal   @default(0) @db.Decimal(18, 8)
+  staked_balance       Decimal   @default(0) @db.Decimal(18, 8)
+  total_earned         Decimal   @default(0) @db.Decimal(18, 8)
+  referral_code        String    @unique
+  referred_by          String?   @db.Uuid
+  mobile               String?
+  country              String?
+  address              String?
+  state                String?
+  zip_code             String?
+  city                 String?
+  profile_complete     Boolean   @default(false)
+  email_verified       Boolean   @default(true)
+  is_active            Boolean   @default(true)
+  last_login           DateTime?
+  last_ip              String?
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+
+  referrer  users?   @relation("UserReferrals", fields: [referred_by], references: [id])
+  referrals users[]  @relation("UserReferrals")
+
+  stakes              user_stakes[]
+  deposits            deposits[]
+  withdrawals         withdrawals[]
+  transactions        transactions[]
+  activity_logs       activity_logs[]
+  email_logs          email_logs[]
+  user_wallets        user_wallets[]
+
+  @@map("users")
+}
+
+model staking_plans {
+  id                  String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title               String
+  badge               String?      // e.g. "POPULAR", "HIGH YIELD"
+  min_amount          Decimal      @db.Decimal(18, 8)
+  max_amount          Decimal      @db.Decimal(18, 8)
+  apy_percent         Decimal      @db.Decimal(5, 2)
+  daily_return_percent Decimal     @db.Decimal(5, 2)
+  duration_days       Int          // lockup period in days (0 for flexible)
+  capital_return      Boolean      @default(true)
+  is_active           Boolean      @default(true)
+  sort_order          Int          @default(0)
+  created_at          DateTime     @default(now())
+  updated_at          DateTime     @updatedAt
+
+  user_stakes         user_stakes[]
+
+  @@map("staking_plans")
+}
+
+model user_stakes {
+  id                  String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id             String        @db.Uuid
+  plan_id             String        @db.Uuid
+  amount              Decimal       @db.Decimal(18, 8)
+  daily_profit        Decimal       @db.Decimal(18, 8)
+  total_earned        Decimal       @default(0) @db.Decimal(18, 8)
+  start_date          DateTime      @default(now())
+  end_date            DateTime
+  last_claim_date     DateTime?
+  status              String        @default("ACTIVE") // ACTIVE, COMPLETED, CANCELLED
+  created_at          DateTime      @default(now())
+
+  user users        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  plan staking_plans @relation(fields: [plan_id], references: [id])
+
+  @@index([user_id])
+  @@index([status])
+  @@map("user_stakes")
+}
+
+model deposits {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id            String    @db.Uuid
+  amount             Decimal   @db.Decimal(18, 8)
+  payment_method     String    // USDT, BTC, ETH
+  crypto_amount      Decimal?  @db.Decimal(18, 8)
+  proof_image        String?
+  transaction_hash   String?
+  status             String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  rejection_reason   String?
+  approved_by        String?   @db.Uuid
+  approved_at        DateTime?
+  created_at         DateTime  @default(now())
+
+  user     users   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  approver admins? @relation("ApprovedDeposits", fields: [approved_by], references: [id])
+
+  @@index([user_id])
+  @@index([status])
+  @@map("deposits")
+}
+
+model withdrawals {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id            String    @db.Uuid
+  amount             Decimal   @db.Decimal(18, 8)
+  withdrawal_method  String    // USDT_BEP20, USDT_TRC20, BTC, ETH
+  fees               Decimal   @default(0) @db.Decimal(18, 8)
+  net_amount         Decimal   @db.Decimal(18, 8)
+  wallet_address     String
+  status             String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  rejection_reason   String?
+  processed_by       String?   @db.Uuid
+  processed_at       DateTime?
+  created_at         DateTime  @default(now())
+
+  user      users   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  processor admins? @relation("ProcessedWithdrawals", fields: [processed_by], references: [id])
+
+  @@index([user_id])
+  @@index([status])
+  @@map("withdrawals")
+}
+
+model transactions {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id        String   @db.Uuid
+  type           String   // DEPOSIT, WITHDRAWAL, STAKE, STAKE_PROFIT, CAPITAL_RETURN, REFERRAL_COMMISSION
+  amount         Decimal  @db.Decimal(18, 8)
+  balance_before Decimal  @db.Decimal(18, 8)
+  balance_after  Decimal  @db.Decimal(18, 8)
+  reference_id   String?
+  description    String
+  created_at     DateTime @default(now())
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([created_at])
+  @@index([type])
+  @@map("transactions")
+}
+
+model payout_cryptocurrencies {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  icon           String?
+  name           String
+  symbol         String
+  network        String
+  wallet_address String?
+  qr_code        String?
+  status         Boolean  @default(true)
+
+  @@unique([symbol, network])
+  @@map("payout_cryptocurrencies")
+}
+
+model user_wallets {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String   @db.Uuid
+  symbol     String
+  network    String
+  address    String
+  label      String?
+  created_at DateTime @default(now())
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, symbol, network])
+  @@map("user_wallets")
+}
+
+model email_settings {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  smtp_host        String   @default("smtp.gmail.com")
+  smtp_port        Int      @default(587)
+  smtp_user        String   @default("")
+  smtp_pass        String   @default("")
+  from_email       String   @default("noreply@stakelab.io")
+  from_name        String   @default("Stakelab")
+  
+  notify_deposit_processing     Boolean @default(true)
+  notify_deposit_approved       Boolean @default(true)
+  notify_deposit_rejected       Boolean @default(true)
+  notify_withdrawal_processing  Boolean @default(true)
+  notify_withdrawal_approved    Boolean @default(true)
+  notify_withdrawal_rejected    Boolean @default(true)
+  notify_profit_return          Boolean @default(true)
+
+  updated_at       DateTime @updatedAt
+
+  @@map("email_settings")
+}
+
+model email_logs {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String   @db.Uuid
+  recipient  String
+  subject    String
+  email_type String
+  status     String
+  sent_at    DateTime @default(now())
+  error_msg  String?
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("email_logs")
+}
+
+model settings {
+  id                       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  site_name                String   @default("Stakelab")
+  site_title               String   @default("Stakelab - Next Gen Crypto Staking & Yield Protocol")
+  currency_name            String   @default("USD")
+  currency_symbol          String   @default("$")
+  min_deposit              Decimal  @default(10) @db.Decimal(18, 8)
+  max_deposit              Decimal  @default(100000) @db.Decimal(18, 8)
+  min_withdrawal           Decimal  @default(10) @db.Decimal(18, 8)
+  max_withdrawal           Decimal  @default(10000) @db.Decimal(18, 8)
+  withdrawal_charge        Decimal  @default(1) @db.Decimal(5, 2)
+  referral_commission      Decimal  @default(5) @db.Decimal(5, 2)
+  telegram_support         String?  @default("https://t.me/stakelab_support")
+  updated_at               DateTime @updatedAt
+
+  @@map("settings")
+}
+
+model activity_logs {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String   @db.Uuid
+  action     String
+  ip_address String?
+  user_agent String?
+  created_at DateTime @default(now())
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("activity_logs")
+}
+
+model admin_logs {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  admin_id   String   @db.Uuid
+  action     String
+  target_id  String?
+  ip_address String?
+  created_at DateTime @default(now())
+
+  admin admins @relation(fields: [admin_id], references: [id], onDelete: Cascade)
+
+  @@map("admin_logs")
+}

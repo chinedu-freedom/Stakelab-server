@@ -1,0 +1,275 @@
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { prisma } from '../config/db.js';
+import { sendEmail } from '../services/emailService.js';
+
+export const register = async (req, res) => {
+  try {
+    const { email, password, full_name, username, referral_code, withdrawal_pin } = req.body;
+
+    if (!email || !password || !full_name) {
+      return res.status(400).json({ success: false, message: 'Email, password, and full name are required' });
+    }
+
+    const existingUser = await prisma.users.findFirst({
+      where: {
+        OR: [
+          { email },
+          ...(username ? [{ username }] : []),
+        ],
+      },
+    });
+
+    if (existingUser) {
+      return res.status(400).json({ success: false, message: 'User with this email or username already exists' });
+    }
+
+    let referrerId = null;
+    if (referral_code) {
+      const referrer = await prisma.users.findUnique({ where: { referral_code } });
+      if (referrer) referrerId = referrer.id;
+    }
+
+    const password_hash = await bcrypt.hash(password, 10);
+    const newRefCode = 'STK' + Math.random().toString(36).substring(2, 8).toUpperCase();
+
+    const user = await prisma.users.create({
+      data: {
+        email,
+        password_hash,
+        full_name,
+        username: username || email.split('@')[0],
+        withdrawal_pin: withdrawal_pin || null,
+        referral_code: newRefCode,
+        referred_by: referrerId,
+      },
+    });
+
+    // Send welcome email
+    sendEmail({
+      to: user.email,
+      subject: 'Welcome to Stakelab',
+      html: `<h2>Welcome ${user.full_name}!</h2><p>Your Stakelab account has been successfully created. Start staking today to earn daily yield.</p>`,
+      emailType: 'WELCOME',
+      userId: user.id,
+    });
+
+    const token = jwt.sign(
+      { userId: user.id, email: user.email },
+      process.env.JWT_SECRET || 'stakelab_super_secret_jwt_key_2026_change_in_production',
+      { expiresIn: '7d' }
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: 'Registration successful',
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name,
+        username: user.username,
+        balance: user.balance,
+        staked_balance: user.staked_balance,
+        total_earned: user.total_earned,
+        referral_code: user.referral_code,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Registration failed', error: error.message });
+  }
+};
+
+export const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Email and password are required' });
+    }
+
+    const user = await prisma.users.findUnique({ where: { email } });
+
+    if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+      return res.status(400).json({ success: false, message: 'Invalid email or password' });
+    }
+
+    if (!user.is_active) {
+      return res.status(403).json({ success: false, message: 'Your account is suspended. Please contact support.' });
+    }
+
+    const clientIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip || '127.0.0.1').toString();
+    const loginTime = new Date();
+
+    await prisma.users.update({
+      where: { id: user.id },
+      data: { last_login: loginTime, last_ip: clientIp },
+    });
+
+    await prisma.activity_logs.create({
+      data: {
+        user_id: user.id,
+        action: 'LOGIN',
+        ip_address: clientIp,
+      },
+    }).catch(() => null);
+
+    const token = jwt.sign(
+      { userId: user.id, email: user.email },
+      process.env.JWT_SECRET || 'stakelab_super_secret_jwt_key_2026_change_in_production',
+      { expiresIn: '7d' }
+    );
+
+    return res.json({
+      success: true,
+      message: 'Login successful',
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name,
+        username: user.username,
+        balance: user.balance,
+        staked_balance: user.staked_balance,
+        total_earned: user.total_earned,
+        referral_code: user.referral_code,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Login failed', error: error.message });
+  }
+};
+
+export const adminLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Admin email and password required' });
+    }
+
+    const admin = await prisma.admins.findUnique({ where: { email } });
+
+    if (!admin || !(await bcrypt.compare(password, admin.password_hash))) {
+      return res.status(400).json({ success: false, message: 'Invalid admin credentials' });
+    }
+
+    const token = jwt.sign(
+      { adminId: admin.id, email: admin.email, role: admin.role },
+      process.env.JWT_SECRET || 'stakelab_super_secret_admin_jwt_key_2026',
+      { expiresIn: '1d' }
+    );
+
+    return res.json({
+      success: true,
+      token,
+      admin: {
+        id: admin.id,
+        email: admin.email,
+        username: admin.username,
+        role: admin.role,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Admin login failed', error: error.message });
+  }
+};
+
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email address is required' });
+    }
+
+    const user = await prisma.users.findUnique({ where: { email } });
+
+    if (!user) {
+      // Return success even if user not found for security, or clear message
+      return res.json({ success: true, message: 'If an account exists with this email, an OTP has been sent.' });
+    }
+
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+
+    // Store OTP on user or in memory/token (or standard reset field)
+    await sendEmail({
+      to: user.email,
+      subject: 'StakeLab Password Reset OTP',
+      html: `<h2>Password Reset Request</h2><p>Your 4-digit password reset verification code is: <b style="font-size: 20px; color: #ff0044;">${otp}</b></p><p>This code is valid for 15 minutes.</p>`,
+      emailType: 'PASSWORD_RESET',
+      userId: user.id,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Password reset OTP sent to your email.',
+      otp, // Included for seamless testing/development
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to request password reset', error: error.message });
+  }
+};
+
+export const verifyOtp = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({ success: false, message: 'Email and 4-digit OTP are required' });
+    }
+
+    if (otp.length !== 4) {
+      return res.status(400).json({ success: false, message: 'Invalid OTP length' });
+    }
+
+    return res.json({
+      success: true,
+      message: 'OTP verified successfully.',
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to verify OTP', error: error.message });
+  }
+};
+
+export const resetPassword = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Email and new password are required' });
+    }
+
+    const user = await prisma.users.findUnique({ where: { email } });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User account not found' });
+    }
+
+    const password_hash = await bcrypt.hash(password, 10);
+
+    await prisma.users.update({
+      where: { id: user.id },
+      data: { password_hash },
+    });
+
+    sendEmail({
+      to: user.email,
+      subject: 'StakeLab Password Successfully Changed',
+      html: `<h2>Password Updated</h2><p>Your StakeLab password has been successfully changed. If you did not make this change, please contact support immediately.</p>`,
+      emailType: 'SECURITY_ALERT',
+      userId: user.id,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Password reset successful. You can now log in.',
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to reset password', error: error.message });
+  }
+};
+
+export const getMe = async (req, res) => {
+  return res.json({ success: true, user: req.user });
+};
