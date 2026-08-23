@@ -22,6 +22,13 @@ export const authenticateUser = async (req, res, next) => {
         staked_balance: true,
         total_earned: true,
         referral_code: true,
+        mobile: true,
+        country: true,
+        address: true,
+        state: true,
+        zip_code: true,
+        city: true,
+        profile_complete: true,
         is_active: true,
       },
     });

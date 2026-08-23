@@ -17,8 +17,9 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'stakelab-backend', time: new Date() });
 });
 
-// API Routes
+// API Routes (supports both /api prefix and root routes)
 app.use('/api', apiRoutes);
+app.use('/', apiRoutes);
 
 // Global Error Handler
 app.use((err, req, res, next) => {

@@ -14,7 +14,7 @@ export const getStakingPlans = async (req, res) => {
 
 export const createStake = async (req, res) => {
   try {
-    const { plan_id, amount, is_compounding = true } = req.body;
+    const { plan_id, amount, wallet_type = 'main', is_compounding = true } = req.body;
     const userId = req.user.id;
 
     if (!plan_id || !amount || parseFloat(amount) <= 0) {
@@ -36,8 +36,15 @@ export const createStake = async (req, res) => {
     }
 
     const user = await prisma.users.findUnique({ where: { id: userId } });
-    if (parseFloat(user.balance) < stakeAmount) {
-      return res.status(400).json({ success: false, message: 'Insufficient balance' });
+
+    let sourceBalance = parseFloat(user.balance);
+    if (wallet_type === 'profit') {
+      sourceBalance = parseFloat(user.total_earned || 0);
+    }
+
+    if (sourceBalance < stakeAmount) {
+      const walletName = wallet_type === 'profit' ? 'Profit Wallet' : 'Main Wallet';
+      return res.status(400).json({ success: false, message: `Insufficient balance in ${walletName}` });
     }
 
     const dailyProfit = (stakeAmount * parseFloat(plan.daily_return_percent)) / 100;
@@ -45,7 +52,8 @@ export const createStake = async (req, res) => {
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + plan.duration_days);
 
-    const newBalance = parseFloat(user.balance) - stakeAmount;
+    const newBalance = wallet_type === 'profit' ? parseFloat(user.balance) : parseFloat(user.balance) - stakeAmount;
+    const newTotalEarned = wallet_type === 'profit' ? parseFloat(user.total_earned || 0) - stakeAmount : parseFloat(user.total_earned || 0);
     const newStaked = parseFloat(user.staked_balance) + stakeAmount;
 
     const [stake, updatedUser, tx] = await prisma.$transaction([
@@ -64,6 +72,7 @@ export const createStake = async (req, res) => {
         where: { id: userId },
         data: {
           balance: newBalance,
+          total_earned: newTotalEarned,
           staked_balance: newStaked,
         },
       }),
@@ -72,9 +81,9 @@ export const createStake = async (req, res) => {
           user_id: userId,
           type: 'STAKE',
           amount: stakeAmount,
-          balance_before: user.balance,
-          balance_after: newBalance,
-          description: `Staked $${stakeAmount} into plan ${plan.title} (${is_compounding ? 'Compounding Daily Yield' : 'Simple Yield'})`,
+          balance_before: sourceBalance,
+          balance_after: sourceBalance - stakeAmount,
+          description: `Staked $${stakeAmount} into ${plan.title} using ${wallet_type === 'profit' ? 'Profit Wallet' : 'Main Wallet'}`,
         },
       }),
     ]);

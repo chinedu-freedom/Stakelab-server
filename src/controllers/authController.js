@@ -26,7 +26,14 @@ export const register = async (req, res) => {
 
     let referrerId = null;
     if (referral_code) {
-      const referrer = await prisma.users.findUnique({ where: { referral_code } });
+      const referrer = await prisma.users.findFirst({
+        where: {
+          OR: [
+            { referral_code: referral_code },
+            { username: referral_code },
+          ],
+        },
+      });
       if (referrer) referrerId = referrer.id;
     }
 
@@ -73,6 +80,13 @@ export const register = async (req, res) => {
         staked_balance: user.staked_balance,
         total_earned: user.total_earned,
         referral_code: user.referral_code,
+        mobile: user.mobile,
+        country: user.country,
+        address: user.address,
+        state: user.state,
+        zip_code: user.zip_code,
+        city: user.city,
+        profile_complete: user.profile_complete,
       },
     });
   } catch (error) {
@@ -133,6 +147,13 @@ export const login = async (req, res) => {
         staked_balance: user.staked_balance,
         total_earned: user.total_earned,
         referral_code: user.referral_code,
+        mobile: user.mobile,
+        country: user.country,
+        address: user.address,
+        state: user.state,
+        zip_code: user.zip_code,
+        city: user.city,
+        profile_complete: user.profile_complete,
       },
     });
   } catch (error) {
@@ -272,4 +293,51 @@ export const resetPassword = async (req, res) => {
 
 export const getMe = async (req, res) => {
   return res.json({ success: true, user: req.user });
+};
+
+export const changePassword = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { current_password, password } = req.body;
+
+    if (!current_password || !password) {
+      return res.status(400).json({ success: false, message: 'Current password and new password are required' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ success: false, message: 'New password must be at least 6 characters' });
+    }
+
+    const dbUser = await prisma.users.findUnique({ where: { id: userId } });
+    if (!dbUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const isMatch = await bcrypt.compare(current_password, dbUser.password_hash);
+    if (!isMatch) {
+      return res.status(400).json({ success: false, message: 'Current password is incorrect' });
+    }
+
+    const password_hash = await bcrypt.hash(password, 10);
+
+    await prisma.users.update({
+      where: { id: userId },
+      data: { password_hash },
+    });
+
+    sendEmail({
+      to: dbUser.email,
+      subject: 'StakeLab Password Successfully Changed',
+      html: `<h2>Password Updated</h2><p>Your StakeLab password has been successfully changed. If you did not make this change, please contact support immediately.</p>`,
+      emailType: 'SECURITY_ALERT',
+      userId: dbUser.id,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Password changed successfully!',
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to change password', error: error.message });
+  }
 };

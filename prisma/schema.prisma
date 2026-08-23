@@ -61,6 +61,7 @@ model users {
   activity_logs       activity_logs[]
   email_logs          email_logs[]
   user_wallets        user_wallets[]
+  support_tickets     support_tickets[]
 
   @@map("users")
 }
@@ -114,7 +115,8 @@ model deposits {
   crypto_amount      Decimal?  @db.Decimal(18, 8)
   proof_image        String?
   transaction_hash   String?
-  status             String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  track_id           String?
+  status             String    @default("PENDING") // initiated, PENDING, APPROVED, REJECTED
   rejection_reason   String?
   approved_by        String?   @db.Uuid
   approved_at        DateTime?
@@ -125,6 +127,7 @@ model deposits {
 
   @@index([user_id])
   @@index([status])
+  @@index([track_id])
   @@map("deposits")
 }
 
@@ -278,4 +281,37 @@ model admin_logs {
   admin admins @relation(fields: [admin_id], references: [id], onDelete: Cascade)
 
   @@map("admin_logs")
+}
+
+model support_tickets {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticket_id   String   @unique // e.g. #728491
+  user_id     String   @db.Uuid
+  subject     String
+  priority    String   @default("Medium") // High, Medium, Low
+  status      String   @default("OPEN") // OPEN, REPLIED, CLOSED
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  user     users             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  messages ticket_messages[]
+
+  @@index([user_id])
+  @@index([status])
+  @@map("support_tickets")
+}
+
+model ticket_messages {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticket_id   String   @db.Uuid
+  sender_type String   // USER, ADMIN
+  sender_name String
+  message     String
+  attachments String?  // JSON stringified array of attachment URLs
+  created_at  DateTime @default(now())
+
+  ticket support_tickets @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
+
+  @@index([ticket_id])
+  @@map("ticket_messages")
 }

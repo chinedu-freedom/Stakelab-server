@@ -240,10 +240,8 @@ export const updatePartners = async (req, res) => {
 };
 
 let customContactLinks = {
-  telegramSupport: 'https://t.me/stakelab_official_support',
   whatsappSupport: 'https://wa.me/1234567890',
   telegramChannel: 'https://t.me/stakelab_community_channel',
-  telegramGroup: 'https://t.me/stakelab_group_chat',
   whatsappGroupModal: 'https://chat.whatsapp.com/stakelab_vip_group',
 };
 
@@ -323,4 +321,274 @@ export const updateDepositWithdrawalSettings = async (req, res) => {
     customDepositWithdrawalSettings = { ...customDepositWithdrawalSettings, ...req.body.settings };
   }
   return res.json({ success: true, message: 'Deposit & Withdrawal settings updated successfully', settings: customDepositWithdrawalSettings });
+};
+
+export const getUserReferralsData = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Level 1 Users (Direct)
+    const level1Users = await prisma.users.findMany({
+      where: { referred_by: userId },
+      select: {
+        id: true,
+        username: true,
+        full_name: true,
+        email: true,
+        created_at: true,
+        is_active: true,
+        balance: true,
+        total_earned: true,
+      },
+      orderBy: { created_at: 'desc' },
+    });
+
+    const level1Ids = level1Users.map((u) => u.id);
+
+    // Level 2 Users
+    const level2Users = level1Ids.length > 0
+      ? await prisma.users.findMany({
+          where: { referred_by: { in: level1Ids } },
+          select: {
+            id: true,
+            username: true,
+            full_name: true,
+            email: true,
+            created_at: true,
+            is_active: true,
+            balance: true,
+            total_earned: true,
+          },
+          orderBy: { created_at: 'desc' },
+        })
+      : [];
+
+    const level2Ids = level2Users.map((u) => u.id);
+
+    // Level 3 Users
+    const level3Users = level2Ids.length > 0
+      ? await prisma.users.findMany({
+          where: { referred_by: { in: level2Ids } },
+          select: {
+            id: true,
+            username: true,
+            full_name: true,
+            email: true,
+            created_at: true,
+            is_active: true,
+            balance: true,
+            total_earned: true,
+          },
+          orderBy: { created_at: 'desc' },
+        })
+      : [];
+
+    const level3Ids = level3Users.map((u) => u.id);
+    const allReferredIds = [...level1Ids, ...level2Ids, ...level3Ids];
+
+    // Fetch approved deposits
+    const confirmedDeposits = allReferredIds.length > 0
+      ? await prisma.deposits.findMany({
+          where: {
+            user_id: { in: allReferredIds },
+            status: 'APPROVED',
+          },
+          select: { user_id: true, amount: true },
+        })
+      : [];
+
+    const depositMap = {};
+    confirmedDeposits.forEach((d) => {
+      depositMap[d.user_id] = (depositMap[d.user_id] || 0) + Number(d.amount);
+    });
+
+    // Fetch active stakes
+    const activeStakes = allReferredIds.length > 0
+      ? await prisma.stakes.findMany({
+          where: {
+            user_id: { in: allReferredIds },
+            status: 'ACTIVE',
+          },
+          select: { user_id: true, amount: true },
+        })
+      : [];
+
+    const stakeMap = {};
+    activeStakes.forEach((s) => {
+      stakeMap[s.user_id] = (stakeMap[s.user_id] || 0) + Number(s.amount);
+    });
+
+    // Fetch referral commission transactions
+    const commissionTx = await prisma.transactions.findMany({
+      where: {
+        user_id: userId,
+        type: 'REFERRAL_COMMISSION',
+      },
+      select: { amount: true, description: true },
+    });
+
+    const totalTeamCommission = commissionTx.reduce((acc, tx) => acc + Number(tx.amount), 0);
+
+    const buildLevelData = (usersList, commPerc) => {
+      let numberActive = 0;
+      let totalRecharge = 0;
+      let totalStaked = 0;
+
+      const formattedUsers = usersList.map((u) => {
+        const userDep = depositMap[u.id] || 0;
+        const userStake = stakeMap[u.id] || 0;
+        const active = u.is_active || userDep > 0 || userStake > 0;
+        if (active) numberActive++;
+        totalRecharge += userDep;
+        totalStaked += userStake;
+
+        return {
+          id: u.id,
+          username: u.username,
+          full_name: u.full_name,
+          email: u.email,
+          created_at: u.created_at,
+          is_active: active,
+          totalRecharge: userDep,
+          totalStaked: userStake,
+        };
+      });
+
+      const commission = totalStaked * (commPerc / 100);
+
+      return {
+        totalHeadcount: usersList.length,
+        numberActive,
+        totalRecharge,
+        commission,
+        users: formattedUsers,
+      };
+    };
+
+    const level1Data = buildLevelData(level1Users, 10);
+    const level2Data = buildLevelData(level2Users, 5);
+    const level3Data = buildLevelData(level3Users, 3);
+
+    const totalTeamMembers = level1Data.totalHeadcount + level2Data.totalHeadcount + level3Data.totalHeadcount;
+
+    return res.json({
+      success: true,
+      totalTeamMembers,
+      teamCommission: totalTeamCommission > 0 ? totalTeamCommission : (level1Data.commission + level2Data.commission + level3Data.commission),
+      levels: {
+        level1: level1Data,
+        level2: level2Data,
+        level3: level3Data,
+      },
+    });
+  } catch (error) {
+    console.error('Failed to fetch referral levels data:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch referral data', error: error.message });
+  }
+};
+
+export const sendSecurityPinOtp = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await prisma.users.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    await prisma.users.update({
+      where: { id: userId },
+      data: {
+        otp_secret: otpCode,
+        otp_expires_at: expiresAt,
+      },
+    });
+
+    sendEmail({
+      to: user.email,
+      subject: '🔑 Security PIN Setup / Reset Code - StakeLab',
+      html: `<h2>Security PIN Reset Request</h2><p>Your 6-digit verification code is: <b style="font-size:20px;color:#ff0044;">${otpCode}</b></p><p>This code expires in 10 minutes.</p>`,
+      emailType: 'PIN_RESET_OTP',
+      userId,
+    });
+
+    return res.json({ success: true, message: 'Verification code sent to your email' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to send OTP code', error: error.message });
+  }
+};
+
+export const updateSecurityPin = async (req, res) => {
+  try {
+    const { new_pin, otp_code } = req.body;
+    const userId = req.user.id;
+
+    if (!new_pin || new_pin.length < 4) {
+      return res.status(400).json({ success: false, message: 'PIN must be at least 4 digits' });
+    }
+
+    const user = await prisma.users.findUnique({ where: { id: userId } });
+
+    if (otp_code) {
+      if (user.otp_secret !== otp_code) {
+        return res.status(400).json({ success: false, message: 'Invalid verification OTP code' });
+      }
+      if (user.otp_expires_at && new Date() > new Date(user.otp_expires_at)) {
+        return res.status(400).json({ success: false, message: 'OTP code has expired' });
+      }
+    }
+
+    await prisma.users.update({
+      where: { id: userId },
+      data: {
+        withdrawal_pin: new_pin,
+        otp_secret: null,
+        otp_expires_at: null,
+      },
+    });
+
+    return res.json({ success: true, message: 'Security PIN updated successfully!' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to update Security PIN', error: error.message });
+  }
+};
+
+export const getUserNotifications = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const answeredTickets = await prisma.support_tickets.findMany({
+      where: { user_id: userId, status: { in: ['ANSWERED', 'REPLIED'] } },
+      take: 5,
+      orderBy: { updated_at: 'desc' },
+      select: { id: true, ticket_code: true, subject: true, status: true, updated_at: true },
+    });
+
+    const recentDeposits = await prisma.deposits.findMany({
+      where: { user_id: userId },
+      take: 5,
+      orderBy: { created_at: 'desc' },
+      select: { id: true, amount: true, status: true, created_at: true },
+    });
+
+    const recentWithdrawals = await prisma.withdrawals.findMany({
+      where: { user_id: userId },
+      take: 5,
+      orderBy: { created_at: 'desc' },
+      select: { id: true, amount: true, status: true, created_at: true },
+    });
+
+    const unreadCount = answeredTickets.length + recentDeposits.filter((d) => d.status === 'APPROVED').length;
+
+    return res.json({
+      success: true,
+      unreadCount,
+      tickets: answeredTickets,
+      deposits: recentDeposits,
+      withdrawals: recentWithdrawals,
+    });
+  } catch (err) {
+    console.error('Error fetching user notifications:', err);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
 };
