@@ -23,6 +23,7 @@ import {
   getWhyChooseUs,
   updateWhyChooseUs,
   getDepositWithdrawalSettings,
+  updateDepositWithdrawalSettings,
   sendSecurityPinOtp,
   updateSecurityPin,
   getUserNotifications,
@@ -111,6 +112,7 @@ router.get('/public/announcements', getAnnouncements);
 router.get('/public/partners', getPartners);
 router.get('/public/contact-links', getContactLinks);
 router.get('/public/why-choose-us', getWhyChooseUs);
+router.get('/public/logo-favicon', getLogoFaviconSettings);
 router.get('/public/deposit-withdrawal-settings', getDepositWithdrawalSettings);
 router.post('/admin/deposit-withdrawal-settings', authenticateAdmin, updateDepositWithdrawalSettings);
 
