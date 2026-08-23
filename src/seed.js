@@ -7,16 +7,16 @@ async function seed() {
   // Seed Admin
   const adminPassword = await bcrypt.hash('admin123456', 10);
   const admin = await prisma.admins.upsert({
-    where: { email: 'admin@stakelab.io' },
+    where: { email: 'admin@everstake.cx' },
     update: {},
     create: {
-      email: 'admin@stakelab.io',
+      email: 'admin@everstake.cx',
       password_hash: adminPassword,
       username: 'admin',
       role: 'admin',
     },
   });
-  console.log('✅ Default Admin created: admin@stakelab.io / admin123456');
+  console.log('✅ Default Admin created: admin@everstake.cx / admin123456');
 
   // Seed Default Settings
   await prisma.settings.upsert({
@@ -24,8 +24,8 @@ async function seed() {
     update: {},
     create: {
       id: '00000000-0000-0000-0000-000000000001',
-      site_name: 'Stakelab',
-      site_title: 'Stakelab - Next Gen Crypto Staking & Yield Protocol',
+      site_name: 'EverStake',
+      site_title: 'EverStake - Premier Crypto Staking & Yield Protocol',
       min_deposit: 10,
       max_deposit: 100000,
       min_withdrawal: 10,
@@ -46,8 +46,8 @@ async function seed() {
       smtp_port: 587,
       smtp_user: '',
       smtp_pass: '',
-      from_email: 'noreply@stakelab.io',
-      from_name: 'Stakelab',
+      from_email: 'noreply@everstake.cx',
+      from_name: 'EverStake',
     },
   });
   console.log('✅ Email Settings initialized');
