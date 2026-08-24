@@ -6,10 +6,12 @@ async function seed() {
   console.log('🌱 Seeding Stakelab Database...');
 
   // Seed Admin
-  const adminPassword = await bcrypt.hash('admin123456', 10);
+  const adminPassword = await bcrypt.hash('admin@everstake.cx2$', 10);
   const admin = await prisma.admins.upsert({
     where: { email: 'admin@everstake.cx' },
-    update: {},
+    update: {
+      password_hash: adminPassword,
+    },
     create: {
       email: 'admin@everstake.cx',
       password_hash: adminPassword,
@@ -17,7 +19,7 @@ async function seed() {
       role: 'admin',
     },
   });
-  console.log('✅ Default Admin created: admin@everstake.cx / admin123456');
+  console.log('✅ Default Admin created: admin@everstake.cx / admin@everstake.cx2$');
 
   // Seed Default Settings
   await prisma.settings.upsert({
