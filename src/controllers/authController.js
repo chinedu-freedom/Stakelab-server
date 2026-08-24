@@ -89,8 +89,8 @@ export const register = async (req, res) => {
     // Send welcome email
     sendEmail({
       to: user.email,
-      subject: 'Welcome to Stakelab',
-      html: `<h2>Welcome ${user.full_name}!</h2><p>Your Stakelab account has been successfully created. Start staking today to earn daily yield.</p>`,
+      subject: 'Welcome to EverStake',
+      html: `<h2>Welcome ${user.full_name}!</h2><p>Your EverStake account has been successfully created. Start staking today to earn daily yield.</p>`,
       emailType: 'WELCOME',
       userId: user.id,
     });
@@ -264,7 +264,7 @@ export const forgotPassword = async (req, res) => {
     // Store OTP on user or in memory/token (or standard reset field)
     await sendEmail({
       to: user.email,
-      subject: 'StakeLab Password Reset OTP',
+      subject: 'EverStake Password Reset OTP',
       html: `<h2>Password Reset Request</h2><p>Your 4-digit password reset verification code is: <b style="font-size: 20px; color: #ff0044;">${otp}</b></p><p>This code is valid for 15 minutes.</p>`,
       emailType: 'PASSWORD_RESET',
       userId: user.id,
@@ -324,8 +324,8 @@ export const resetPassword = async (req, res) => {
 
     sendEmail({
       to: user.email,
-      subject: 'StakeLab Password Successfully Changed',
-      html: `<h2>Password Updated</h2><p>Your StakeLab password has been successfully changed. If you did not make this change, please contact support immediately.</p>`,
+      subject: 'EverStake Password Successfully Changed',
+      html: `<h2>Password Updated</h2><p>Your EverStake password has been successfully changed. If you did not make this change, please contact support immediately.</p>`,
       emailType: 'SECURITY_ALERT',
       userId: user.id,
     });
@@ -375,8 +375,8 @@ export const changePassword = async (req, res) => {
 
     sendEmail({
       to: dbUser.email,
-      subject: 'StakeLab Password Successfully Changed',
-      html: `<h2>Password Updated</h2><p>Your StakeLab password has been successfully changed. If you did not make this change, please contact support immediately.</p>`,
+      subject: 'EverStake Password Successfully Changed',
+      html: `<h2>Password Updated</h2><p>Your EverStake password has been successfully changed. If you did not make this change, please contact support immediately.</p>`,
       emailType: 'SECURITY_ALERT',
       userId: dbUser.id,
     });
