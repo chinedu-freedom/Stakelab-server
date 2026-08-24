@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../config/db.js';
 import { sendEmail } from '../services/emailService.js';
 
-const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY || '6LeD_5QtAAAAADjJ_PWUahQ0lyIQG8cDHQUXclhb';
+const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY || '6LffwZUtAAAAALsM0OkIFctHSBITmbn7AZLg3caC';
 
 async function verifyRecaptcha(token, remoteip) {
   if (!token) return true;
