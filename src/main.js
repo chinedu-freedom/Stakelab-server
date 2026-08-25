@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import apiRoutes from './routes/index.js';
+import { seedDefaultStakingPlans } from './seed.js';
 
 dotenv.config();
 
@@ -36,6 +37,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ success: false, message: 'Internal Server Error', error: err.message });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 Stakelab Backend API running on http://localhost:${PORT}`);
+  await seedDefaultStakingPlans();
 });

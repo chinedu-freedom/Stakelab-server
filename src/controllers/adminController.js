@@ -10,6 +10,7 @@ export const getAdminStats = async (req, res) => {
 
     const totalUsers = await prisma.users.count();
     const activeUsers = await prisma.users.count({ where: { is_active: true } });
+    const todayUsers = await prisma.users.count({ where: { created_at: { gte: todayStart } } });
     const emailUnverified = await prisma.users.count({ where: { email_verified: false } });
     const mobileUnverified = await prisma.users.count({ where: { mobile: null } });
     const kycUnverified = await prisma.users.count({ where: { profile_complete: false } });
@@ -24,14 +25,32 @@ export const getAdminStats = async (req, res) => {
       where: { status: 'APPROVED', created_at: { gte: todayStart } },
       _sum: { amount: true },
     });
-    const pendingDepositsCount = await prisma.deposits.count({ where: { status: 'PENDING' } });
+    const pendingDepositsAgg = await prisma.deposits.aggregate({
+      where: { status: 'PENDING' },
+      _sum: { amount: true },
+      _count: { id: true },
+    });
+    const approvedDepositsCount = await prisma.deposits.count({ where: { status: 'APPROVED' } });
+    const pendingDepositsCount = pendingDepositsAgg._count.id || 0;
+    const pendingDepositsSum = pendingDepositsAgg._sum.amount || 0;
     const rejectedDepositsCount = await prisma.deposits.count({ where: { status: 'REJECTED' } });
 
     const totalWithdrawalsAgg = await prisma.withdrawals.aggregate({
       where: { status: 'APPROVED' },
       _sum: { amount: true, charge: true },
     });
-    const pendingWithdrawalsCount = await prisma.withdrawals.count({ where: { status: 'PENDING' } });
+    const todaysWithdrawalAgg = await prisma.withdrawals.aggregate({
+      where: { status: 'APPROVED', created_at: { gte: todayStart } },
+      _sum: { amount: true },
+    });
+    const pendingWithdrawalsAgg = await prisma.withdrawals.aggregate({
+      where: { status: 'PENDING' },
+      _sum: { amount: true },
+      _count: { id: true },
+    });
+    const approvedWithdrawalsCount = await prisma.withdrawals.count({ where: { status: 'APPROVED' } });
+    const pendingWithdrawalsCount = pendingWithdrawalsAgg._count.id || 0;
+    const pendingWithdrawalsSum = pendingWithdrawalsAgg._sum.amount || 0;
     const rejectedWithdrawalsCount = await prisma.withdrawals.count({ where: { status: 'REJECTED' } });
     const pendingTicketsCount = await prisma.tickets.count({ where: { status: 'OPEN' } });
 
@@ -39,6 +58,11 @@ export const getAdminStats = async (req, res) => {
       where: { status: 'ACTIVE' },
       _sum: { amount: true },
     });
+    const todaysStakingAgg = await prisma.user_stakes.aggregate({
+      where: { created_at: { gte: todayStart } },
+      _sum: { amount: true },
+    });
+    const activeStakingCount = await prisma.user_stakes.count({ where: { status: 'ACTIVE' } });
 
     const fourteenDaysAgo = new Date();
     fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
@@ -91,6 +115,7 @@ export const getAdminStats = async (req, res) => {
       stats: {
         totalUsers,
         activeUsers,
+        todayUsers,
         emailUnverified,
         mobileUnverified,
         kycUnverified,
@@ -98,15 +123,22 @@ export const getAdminStats = async (req, res) => {
         totalDeposited: totalDepositsAgg._sum.amount || 0,
         todaysDeposit: todaysDepositAgg._sum.amount || 0,
         pendingDeposits: pendingDepositsCount,
+        pendingDepositsSum,
+        approvedDepositsCount,
         rejectedDeposits: rejectedDepositsCount,
         depositCharge: totalDepositsAgg._sum.charge || 0,
         depositChargeCount: totalDepositsAgg._count.id || 0,
         totalWithdrawn: totalWithdrawalsAgg._sum.amount || 0,
+        todaysWithdrawal: todaysWithdrawalAgg._sum.amount || 0,
         pendingWithdrawals: pendingWithdrawalsCount,
+        pendingWithdrawalsSum,
+        approvedWithdrawalsCount,
         rejectedWithdrawals: rejectedWithdrawalsCount,
         pendingTickets: pendingTicketsCount,
         withdrawalCharge: totalWithdrawalsAgg._sum.charge || 0,
         totalStaked: totalStakedAgg._sum.amount || 0,
+        todaysStaking: todaysStakingAgg._sum.amount || 0,
+        activeStakingCount,
         recentDeposits,
         recentWithdrawals,
         userCountries,
