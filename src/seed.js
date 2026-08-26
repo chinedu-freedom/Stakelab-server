@@ -48,3 +48,33 @@ export const seedDefaultStakingPlans = async () => {
     console.error('⚠️ Staking plans seeding error:', err.message);
   }
 };
+
+export const cleanupDuplicateStakingPlans = async () => {
+  try {
+    const plans = await prisma.staking_plans.findMany({
+      orderBy: { created_at: 'asc' },
+    });
+
+    const seenTitles = new Set();
+    const duplicateIdsToDelete = [];
+
+    for (const p of plans) {
+      const normalizedTitle = p.title.trim().toLowerCase();
+      if (seenTitles.has(normalizedTitle)) {
+        duplicateIdsToDelete.push(p.id);
+      } else {
+        seenTitles.add(normalizedTitle);
+      }
+    }
+
+    if (duplicateIdsToDelete.length > 0) {
+      console.log(`🧹 Removing ${duplicateIdsToDelete.length} duplicate staking plan records...`);
+      await prisma.staking_plans.deleteMany({
+        where: { id: { in: duplicateIdsToDelete } },
+      });
+      console.log('✅ Duplicate staking plans cleaned up!');
+    }
+  } catch (err) {
+    console.error('⚠️ Error cleaning up duplicate staking plans:', err.message);
+  }
+};

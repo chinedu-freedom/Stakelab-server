@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import apiRoutes from './routes/index.js';
-import { seedDefaultStakingPlans } from './seed.js';
+import { seedDefaultStakingPlans, cleanupDuplicateStakingPlans } from './seed.js';
 
 dotenv.config();
 
@@ -40,4 +40,5 @@ app.use((err, req, res, next) => {
 app.listen(PORT, async () => {
   console.log(`🚀 Stakelab Backend API running on http://localhost:${PORT}`);
   await seedDefaultStakingPlans();
+  await cleanupDuplicateStakingPlans();
 });
