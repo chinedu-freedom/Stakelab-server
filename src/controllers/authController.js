@@ -40,7 +40,7 @@ async function verifyRecaptcha(token, remoteip) {
 
 export const register = async (req, res) => {
   try {
-    const { email, password, full_name, username, referral_code, withdrawal_pin, captchaToken } = req.body;
+    const { email, password, full_name, username, referral_code, withdrawal_pin, country, mobile, address, state, zip_code, city, captchaToken } = req.body;
 
     if (captchaToken) {
       const isValidCaptcha = await verifyRecaptcha(captchaToken, req.ip);
@@ -82,12 +82,21 @@ export const register = async (req, res) => {
     const password_hash = await bcrypt.hash(password, 10);
     const newRefCode = 'STK' + Math.random().toString(36).substring(2, 8).toUpperCase();
 
+    const isProfileComplete = Boolean(country && mobile);
+
     const user = await prisma.users.create({
       data: {
         email,
         password_hash,
         full_name,
         username: username || email.split('@')[0],
+        country: country || null,
+        mobile: mobile || null,
+        address: address || null,
+        state: state || null,
+        zip_code: zip_code || null,
+        city: city || null,
+        profile_complete: isProfileComplete,
         withdrawal_pin: withdrawal_pin || null,
         referral_code: newRefCode,
         referred_by: referrerId,
