@@ -346,7 +346,9 @@ export const getUserDailyCheckinStatus = async (req, res) => {
     if (item.day_number < userCheckinState.currentStreak) {
       status = 'claimed';
     } else if (item.day_number === userCheckinState.currentStreak) {
-      status = isClaimedToday ? 'claimed' : 'available';
+      status = isClaimedToday ? 'locked' : 'available';
+    } else {
+      status = 'locked';
     }
     return {
       day: item.day_number,
