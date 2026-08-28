@@ -903,34 +903,131 @@ let logoFaviconStore = {
 };
 
 export const getGeneralSettings = async (req, res) => {
-  return res.json({ success: true, settings: generalSettingsStore });
+  try {
+    let settingRecord = await prisma.settings.findFirst();
+    if (!settingRecord) {
+      settingRecord = await prisma.settings.create({
+        data: {
+          site_name: 'EverStake',
+          site_title: 'EverStake - Next Gen Crypto Staking & Yield Protocol',
+        },
+      });
+    }
+
+    return res.json({
+      success: true,
+      settings: {
+        siteTitle: settingRecord.site_title,
+        currency: settingRecord.currency_name,
+        currencySymbol: settingRecord.currency_symbol,
+        timezone: 'UTC',
+        registrationBonus: 0.0,
+        logoUrl: settingRecord.site_logo,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to fetch general settings', error: error.message });
+  }
 };
 
 export const updateGeneralSettings = async (req, res) => {
   try {
-    const { siteTitle, timezone, registrationBonus, logoUrl } = req.body;
-    if (siteTitle !== undefined) generalSettingsStore.siteTitle = siteTitle;
-    if (timezone !== undefined) generalSettingsStore.timezone = timezone;
-    if (registrationBonus !== undefined) generalSettingsStore.registrationBonus = parseFloat(registrationBonus || 0);
-    if (logoUrl !== undefined) generalSettingsStore.logoUrl = logoUrl;
+    const { siteTitle, currency, currencySymbol, logoUrl } = req.body;
 
-    return res.json({ success: true, message: 'General settings updated successfully!', settings: generalSettingsStore });
+    let settingRecord = await prisma.settings.findFirst();
+    if (!settingRecord) {
+      settingRecord = await prisma.settings.create({
+        data: {
+          site_name: siteTitle || 'EverStake',
+          site_title: siteTitle || 'EverStake - Next Gen Crypto Staking & Yield Protocol',
+          ...(logoUrl && { site_logo: logoUrl }),
+        },
+      });
+    } else {
+      settingRecord = await prisma.settings.update({
+        where: { id: settingRecord.id },
+        data: {
+          ...(siteTitle !== undefined && { site_title: siteTitle, site_name: siteTitle }),
+          ...(currency !== undefined && { currency_name: currency }),
+          ...(currencySymbol !== undefined && { currency_symbol: currencySymbol }),
+          ...(logoUrl !== undefined && { site_logo: logoUrl }),
+        },
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'General settings updated and saved to database successfully!',
+      settings: {
+        siteTitle: settingRecord.site_title,
+        currency: settingRecord.currency_name,
+        currencySymbol: settingRecord.currency_symbol,
+        timezone: 'UTC',
+        registrationBonus: 0.0,
+        logoUrl: settingRecord.site_logo,
+      },
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to update general settings', error: error.message });
   }
 };
 
 export const getLogoFaviconSettings = async (req, res) => {
-  return res.json({ success: true, settings: logoFaviconStore });
+  try {
+    let settingRecord = await prisma.settings.findFirst();
+    if (!settingRecord) {
+      settingRecord = await prisma.settings.create({
+        data: {
+          site_name: 'EverStake',
+          site_title: 'EverStake - Next Gen Crypto Staking & Yield Protocol',
+        },
+      });
+    }
+
+    return res.json({
+      success: true,
+      settings: {
+        logoUrl: settingRecord.site_logo,
+        faviconUrl: settingRecord.site_favicon,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to fetch logo & favicon settings', error: error.message });
+  }
 };
 
 export const updateLogoFaviconSettings = async (req, res) => {
   try {
     const { logoUrl, faviconUrl } = req.body;
-    if (logoUrl !== undefined) logoFaviconStore.logoUrl = logoUrl;
-    if (faviconUrl !== undefined) logoFaviconStore.faviconUrl = faviconUrl;
 
-    return res.json({ success: true, message: 'Logo & Favicon updated successfully!', settings: logoFaviconStore });
+    let settingRecord = await prisma.settings.findFirst();
+    if (!settingRecord) {
+      settingRecord = await prisma.settings.create({
+        data: {
+          site_name: 'EverStake',
+          site_title: 'EverStake - Next Gen Crypto Staking & Yield Protocol',
+          site_logo: logoUrl || null,
+          site_favicon: faviconUrl || null,
+        },
+      });
+    } else {
+      settingRecord = await prisma.settings.update({
+        where: { id: settingRecord.id },
+        data: {
+          ...(logoUrl !== undefined && { site_logo: logoUrl }),
+          ...(faviconUrl !== undefined && { site_favicon: faviconUrl }),
+        },
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Logo & Favicon updated and saved to database successfully!',
+      settings: {
+        logoUrl: settingRecord.site_logo,
+        faviconUrl: settingRecord.site_favicon,
+      },
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to update Logo & Favicon settings', error: error.message });
   }

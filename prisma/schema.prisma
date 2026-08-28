@@ -245,6 +245,8 @@ model settings {
   id                       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   site_name                String   @default("Stakelab")
   site_title               String   @default("Stakelab - Next Gen Crypto Staking & Yield Protocol")
+  site_logo                String?
+  site_favicon             String?
   currency_name            String   @default("USD")
   currency_symbol          String   @default("$")
   min_deposit              Decimal  @default(10) @db.Decimal(18, 8)
