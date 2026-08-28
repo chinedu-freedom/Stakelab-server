@@ -302,7 +302,6 @@ export const forgotPassword = async (req, res) => {
     return res.json({
       success: true,
       message: 'Password reset OTP sent to your email.',
-      otp, // Included for seamless testing/development
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to request password reset', error: error.message });
@@ -446,7 +445,6 @@ export const resendEmailVerification = async (req, res) => {
     return res.json({
       success: true,
       message: 'Verification code sent to your email address.',
-      code: verificationCode,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to resend verification code', error: error.message });
