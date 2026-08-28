@@ -256,16 +256,6 @@ model settings {
   withdrawal_charge        Decimal  @default(1) @db.Decimal(5, 2)
   referral_commission      Decimal  @default(5) @db.Decimal(5, 2)
   telegram_support         String?  @default("https://t.me/stakelab_support")
-  
-  is_maintenance           Boolean  @default(false)
-  maintenance_headline     String?  @default("THE SITE IS UNDER MAINTENANCE")
-  maintenance_description  String?  @default("We're just tuning up a few things. We apologize for the inconvenience but the platform is currently undergoing planned maintenance.\nThanks for your patience.")
-  maintenance_image        String?
-
-  cookie_enabled           Boolean  @default(true)
-  cookie_short_description String?  @default("We may use cookies or any other tracking technologies when you visit our website, including any other media form, mobile website, or mobile application related or connected to help customize the Site and improve your experience.")
-  cookie_full_description  String?  @default("What information do we collect?\nWe gather data from you when you register on our site, submit a request, buy any services, react to an overview, or round out a structure.\n\nHow do we protect your information?\nAll provided delicate data is sent through encrypted protocols.\n\nDo we disclose any information to outside parties?\nWe don't sell, exchange, or in any case move to outside gatherings your data.")
-
   updated_at               DateTime @updatedAt
 
   @@map("settings")
