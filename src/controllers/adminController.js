@@ -18,7 +18,7 @@ export const getAdminStats = async (req, res) => {
 
     const totalDepositsAgg = await prisma.deposits.aggregate({
       where: { status: 'APPROVED' },
-      _sum: { amount: true, charge: true },
+      _sum: { amount: true },
       _count: { id: true },
     });
     const todaysDepositAgg = await prisma.deposits.aggregate({
@@ -37,7 +37,7 @@ export const getAdminStats = async (req, res) => {
 
     const totalWithdrawalsAgg = await prisma.withdrawals.aggregate({
       where: { status: 'APPROVED' },
-      _sum: { amount: true, charge: true },
+      _sum: { amount: true },
     });
     const todaysWithdrawalAgg = await prisma.withdrawals.aggregate({
       where: { status: 'APPROVED', created_at: { gte: todayStart } },
@@ -52,7 +52,7 @@ export const getAdminStats = async (req, res) => {
     const pendingWithdrawalsCount = pendingWithdrawalsAgg._count.id || 0;
     const pendingWithdrawalsSum = pendingWithdrawalsAgg._sum.amount || 0;
     const rejectedWithdrawalsCount = await prisma.withdrawals.count({ where: { status: 'REJECTED' } });
-    const pendingTicketsCount = await prisma.tickets.count({ where: { status: 'OPEN' } });
+    const pendingTicketsCount = await prisma.support_tickets.count({ where: { status: 'OPEN' } });
 
     const totalStakedAgg = await prisma.user_stakes.aggregate({
       where: { status: 'ACTIVE' },
@@ -86,7 +86,7 @@ export const getAdminStats = async (req, res) => {
         username: true,
         email: true,
         created_at: true,
-        balance_usdt: true,
+        balance: true,
       },
     });
 
@@ -126,7 +126,7 @@ export const getAdminStats = async (req, res) => {
         pendingDepositsSum,
         approvedDepositsCount,
         rejectedDeposits: rejectedDepositsCount,
-        depositCharge: totalDepositsAgg._sum.charge || 0,
+        depositCharge: 0,
         depositChargeCount: totalDepositsAgg._count.id || 0,
         totalWithdrawn: totalWithdrawalsAgg._sum.amount || 0,
         todaysWithdrawal: todaysWithdrawalAgg._sum.amount || 0,
@@ -135,19 +135,19 @@ export const getAdminStats = async (req, res) => {
         approvedWithdrawalsCount,
         rejectedWithdrawals: rejectedWithdrawalsCount,
         pendingTickets: pendingTicketsCount,
-        withdrawalCharge: totalWithdrawalsAgg._sum.charge || 0,
+        withdrawalCharge: 0,
         totalStaked: totalStakedAgg._sum.amount || 0,
         todaysStaking: todaysStakingAgg._sum.amount || 0,
         activeStakingCount,
         recentDeposits,
         recentWithdrawals,
-        userCountries,
+        userCountries: [],
         recentUsers: recentUsers.map((u) => ({
           id: u.id,
           name: u.full_name || u.username || 'New User',
           email: u.email,
           createdAt: u.created_at,
-          usdBalance: parseFloat(u.balance_usdt || 0),
+          usdBalance: parseFloat(u.balance || 0),
         })),
         recentActivities: recentTx.map((t) => ({
           id: t.id,
@@ -488,12 +488,12 @@ export const updateUserBalance = async (req, res) => {
     const numAmount = parseFloat(amount);
     const targetWallet = wallet_type || 'Main Balance';
     const isStaked = targetWallet === 'Staked Balance';
-    const currentVal = parseFloat(isStaked ? (user.staked_balance || 0) : (user.balance_usdt || user.balance || 0));
+    const currentVal = parseFloat(isStaked ? (user.staked_balance || 0) : (user.balance || 0));
     const newVal = action === 'add' ? currentVal + numAmount : Math.max(0, currentVal - numAmount);
 
     const userUpdateData = isStaked
       ? { staked_balance: newVal }
-      : { balance_usdt: newVal, balance: newVal };
+      : { balance: newVal };
 
     const [updatedUser] = await prisma.$transaction([
       prisma.users.update({

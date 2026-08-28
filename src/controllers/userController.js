@@ -160,6 +160,34 @@ let customTestimonials = [
   },
 ];
 
+let customHowItWorks = [
+  {
+    num: '1',
+    title: 'Create Your Account',
+    desc: 'Register your EverStake account and complete the required verification steps.',
+    icon: '/images/step1.png',
+  },
+  {
+    num: '2',
+    title: 'Fund Your Wallet',
+    desc: 'Deposit your eligible digital assets into your EverStake wallet.',
+    icon: '/images/step2.png',
+  },
+  {
+    num: '3',
+    title: 'Start Staking',
+    desc: 'Select an available staking option and allocate your assets according to your chosen plan. Where supported, staking rewards can be automatically reinvested to facilitate compounding.',
+    icon: '/images/step3.png',
+  },
+  {
+    num: '4',
+    title: 'Withdraw Your Assets',
+    badge: 'When eligible',
+    desc: 'Request a withdrawal and transfer your available assets to your preferred wallet or exchange, subject to applicable network and platform conditions.',
+    icon: '/images/step4.png',
+  },
+];
+
 export const getHowItWorks = async (req, res) => {
   return res.json({ success: true, steps: customHowItWorks });
 };
@@ -256,36 +284,38 @@ export const updateContactLinks = async (req, res) => {
   return res.json({ success: true, message: 'Contact links updated successfully', contactLinks: customContactLinks });
 };
 
+
+
 let customWhyChooseUs = [
   {
-    title: 'Money Security',
-    desc: 'We provide highest secure transaction, deposit and withdrawal process for your security.',
+    title: 'Institutional Security',
+    desc: 'Enterprise-grade non-custodial validator architecture with robust security controls and risk management.',
     icon: 'ShieldCheck',
   },
   {
-    title: 'Fast Withdraw',
-    desc: 'Our withdrawal process is very fast. Any stakeholders can withdraw anytime from our system.',
-    icon: 'Zap',
+    title: 'Multi-Chain Support',
+    desc: 'Active validator node operations supporting more than 130 Proof-of-Stake blockchain networks.',
+    icon: 'Globe',
   },
   {
-    title: 'Automated Earning',
-    desc: 'Stakeholders earning is automated, while they stake money the get their profit automatically.',
+    title: 'Automated Yield Strategies',
+    desc: 'Intelligent staking engines designed to streamline asset allocation and compounding rewards.',
     icon: 'TrendingUp',
   },
   {
-    title: 'Profitable Plan',
-    desc: 'All of our plans are designed to be profitable for stakeholders, allowing them to earn money in a short period.',
+    title: 'High Availability Infrastructure',
+    desc: '99.9%+ node uptime backed by 24/7 continuous monitoring and rapid response protocols.',
+    icon: 'Zap',
+  },
+  {
+    title: 'Transparent Payouts',
+    desc: 'Reliable reward distributions with instant withdrawal requests subject to network conditions.',
     icon: 'Coins',
   },
   {
-    title: '24/7 Customer Support',
-    desc: "Our 24/7 customer support ensures you're always assisted, no matter the time or issue.",
+    title: '24/7 Professional Support',
+    desc: 'Dedicated technical assistance and client care available around the clock.',
     icon: 'Headphones',
-  },
-  {
-    title: 'Referral Bonus',
-    desc: 'Earn high passive commission from multi-tier affiliate referral rewards when inviting friends.',
-    icon: 'Users',
   },
 ];
 
