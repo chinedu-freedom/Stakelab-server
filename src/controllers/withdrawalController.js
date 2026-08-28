@@ -6,6 +6,14 @@ export const createWithdrawal = async (req, res) => {
     const { amount, withdrawal_method, wallet_address, withdrawal_pin } = req.body;
     const userId = req.user.id;
 
+    if (!req.user.email_verified) {
+      return res.status(403).json({
+        success: false,
+        require_email_verification: true,
+        message: 'Please verify your email address to perform withdrawals.',
+      });
+    }
+
     if (!amount || parseFloat(amount) <= 0 || !withdrawal_method || !wallet_address) {
       return res.status(400).json({ success: false, message: 'Amount, method, and wallet address are required' });
     }

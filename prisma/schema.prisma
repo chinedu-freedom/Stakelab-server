@@ -44,7 +44,9 @@ model users {
   zip_code             String?
   city                 String?
   profile_complete     Boolean   @default(false)
-  email_verified       Boolean   @default(true)
+  email_verified       Boolean   @default(false)
+  email_verify_code    String?
+  email_verify_expires DateTime?
   is_active            Boolean   @default(true)
   last_login           DateTime?
   last_ip              String?

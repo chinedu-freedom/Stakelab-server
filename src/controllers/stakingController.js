@@ -17,6 +17,14 @@ export const createStake = async (req, res) => {
     const { plan_id, amount, wallet_type = 'main', is_compounding = true } = req.body;
     const userId = req.user.id;
 
+    if (!req.user.email_verified) {
+      return res.status(403).json({
+        success: false,
+        require_email_verification: true,
+        message: 'Please verify your email address to perform staking.',
+      });
+    }
+
     if (!plan_id || !amount || parseFloat(amount) <= 0) {
       return res.status(400).json({ success: false, message: 'Plan ID and valid amount required' });
     }

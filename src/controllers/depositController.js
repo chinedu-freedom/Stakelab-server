@@ -18,6 +18,14 @@ export const createDeposit = async (req, res) => {
     const { amount, payment_method, transaction_hash, proof_image } = req.body;
     const userId = req.user.id;
 
+    if (!req.user.email_verified) {
+      return res.status(403).json({
+        success: false,
+        require_email_verification: true,
+        message: 'Please verify your email address to perform deposits.',
+      });
+    }
+
     if (!amount || parseFloat(amount) <= 0 || !payment_method) {
       return res.status(400).json({ success: false, message: 'Amount and payment method are required' });
     }

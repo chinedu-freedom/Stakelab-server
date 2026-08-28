@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { register, login, adminLogin, getMe, forgotPassword, verifyOtp, resetPassword, changePassword } from '../controllers/authController.js';
+import { register, login, adminLogin, getMe, forgotPassword, verifyOtp, resetPassword, changePassword, resendEmailVerification, verifyEmailCode } from '../controllers/authController.js';
 import { getStakingPlans, createStake, getUserStakes, claimStakeProfit } from '../controllers/stakingController.js';
 import { getPaymentMethods, createDeposit, getUserDeposits, oxapayWebhook } from '../controllers/depositController.js';
 import { createWithdrawal, getUserWithdrawals, addOrUpdateUserWallet, getUserWallets } from '../controllers/withdrawalController.js';
@@ -118,6 +118,8 @@ router.post('/admin/deposit-withdrawal-settings', authenticateAdmin, updateDepos
 
 // User Protected Routes
 router.get('/auth/me', authenticateUser, getMe);
+router.post('/auth/send-email-verification', authenticateUser, resendEmailVerification);
+router.post('/auth/verify-email', authenticateUser, verifyEmailCode);
 router.get('/user/dashboard', authenticateUser, getUserDashboardData);
 router.post('/user/data', authenticateUser, updateUserData);
 router.post('/user/change-password', authenticateUser, changePassword);

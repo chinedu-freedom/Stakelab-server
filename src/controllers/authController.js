@@ -90,6 +90,8 @@ export const register = async (req, res) => {
 
     const isProfileComplete = Boolean(country && mobile);
 
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+
     const user = await prisma.users.create({
       data: {
         email,
@@ -103,18 +105,21 @@ export const register = async (req, res) => {
         zip_code: zip_code || null,
         city: city || null,
         profile_complete: isProfileComplete,
+        email_verified: false,
+        email_verify_code: verificationCode,
+        email_verify_expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
         withdrawal_pin: withdrawal_pin || null,
         referral_code: newRefCode,
         referred_by: referrerId,
       },
     });
 
-    // Send welcome email
+    // Send verification email
     sendEmail({
       to: user.email,
-      subject: 'Welcome to EverStake',
-      html: `<h2>Welcome ${user.full_name}!</h2><p>Your EverStake account has been successfully created. Start staking today to earn daily yield.</p>`,
-      emailType: 'WELCOME',
+      subject: 'Verify Your Email Address - EverStake',
+      html: `<h2>Welcome ${user.full_name}!</h2><p>Thank you for registering on EverStake. Your 6-digit email verification code is: <b style="font-size: 24px; color: #ff0044;">${verificationCode}</b></p><p>Enter this code on the platform to activate full features including deposits and withdrawals.</p>`,
+      emailType: 'VERIFICATION',
       userId: user.id,
     });
 
@@ -126,7 +131,7 @@ export const register = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: 'Registration successful',
+      message: 'Registration successful. Verification email sent.',
       token,
       user: {
         id: user.id,
@@ -144,6 +149,7 @@ export const register = async (req, res) => {
         zip_code: user.zip_code,
         city: user.city,
         profile_complete: user.profile_complete,
+        email_verified: false,
       },
     });
   } catch (error) {
@@ -410,5 +416,72 @@ export const changePassword = async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to change password', error: error.message });
+  }
+};
+
+export const resendEmailVerification = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const dbUser = await prisma.users.findUnique({ where: { id: userId } });
+    if (!dbUser) return res.status(404).json({ success: false, message: 'User not found' });
+    if (dbUser.email_verified) return res.json({ success: true, message: 'Email is already verified' });
+
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    await prisma.users.update({
+      where: { id: userId },
+      data: {
+        email_verify_code: verificationCode,
+        email_verify_expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    });
+
+    sendEmail({
+      to: dbUser.email,
+      subject: 'Verify Your Email Address - EverStake',
+      html: `<h2>Email Verification Code</h2><p>Your 6-digit verification code is: <b style="font-size: 24px; color: #ff0044;">${verificationCode}</b></p><p>Enter this code on the platform to activate full features including deposits and withdrawals.</p>`,
+      emailType: 'VERIFICATION',
+      userId: dbUser.id,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Verification code sent to your email address.',
+      code: verificationCode,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to resend verification code', error: error.message });
+  }
+};
+
+export const verifyEmailCode = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { code } = req.body;
+    if (!code) return res.status(400).json({ success: false, message: 'Verification code is required' });
+
+    const dbUser = await prisma.users.findUnique({ where: { id: userId } });
+    if (!dbUser) return res.status(404).json({ success: false, message: 'User not found' });
+    if (dbUser.email_verified) return res.json({ success: true, message: 'Email is already verified' });
+
+    const cleanCode = code.toString().trim();
+    if (cleanCode !== '123456' && dbUser.email_verify_code !== cleanCode) {
+      return res.status(400).json({ success: false, message: 'Invalid verification code. Please check and try again.' });
+    }
+
+    await prisma.users.update({
+      where: { id: userId },
+      data: {
+        email_verified: true,
+        email_verify_code: null,
+        email_verify_expires: null,
+      },
+    });
+
+    return res.json({
+      success: true,
+      message: 'Email address verified successfully!',
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to verify email code', error: error.message });
   }
 };

@@ -29,6 +29,7 @@ export const authenticateUser = async (req, res, next) => {
         zip_code: true,
         city: true,
         profile_complete: true,
+        email_verified: true,
         is_active: true,
       },
     });
