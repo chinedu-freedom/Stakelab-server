@@ -63,7 +63,13 @@ export const register = async (req, res) => {
     });
 
     if (existingUser) {
-      return res.status(400).json({ success: false, message: 'User with this email or username already exists' });
+      if (existingUser.email.toLowerCase() === email.toLowerCase()) {
+        return res.status(400).json({ success: false, message: 'User with this email already exists' });
+      }
+      if (username && existingUser.username && existingUser.username.toLowerCase() === username.toLowerCase()) {
+        return res.status(400).json({ success: false, message: 'This username is already taken' });
+      }
+      return res.status(400).json({ success: false, message: 'User with this email already exists' });
     }
 
     let referrerId = null;
