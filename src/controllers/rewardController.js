@@ -399,14 +399,11 @@ export const claimUserDailyCheckin = async (req, res) => {
           prisma.transactions.create({
             data: {
               user_id: userId,
-              trx: `TRX-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+              type: 'DAILY_CHECKIN',
               amount: rewardAmount,
-              charge: 0,
-              post_balance: newBal,
-              type: '+',
-              trx_type: '+',
-              details: `Daily Check-In Reward (Day ${claimedDay})`,
-              remark: 'Daily Check-In',
+              balance_before: oldBal,
+              balance_after: newBal,
+              description: `Daily Check-In Reward (Day ${claimedDay})`,
               created_at: new Date(),
             },
           }),
@@ -596,14 +593,11 @@ export const claimUserTask = async (req, res) => {
           prisma.transactions.create({
             data: {
               user_id: userId,
-              trx: `TRX-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+              type: 'TASK_REWARD',
               amount: rewardAmount,
-              charge: 0,
-              post_balance: newBal,
-              type: '+',
-              trx_type: '+',
-              details: `Claimed Task: ${taskObj.title || taskObj.task_name || 'Task Reward'}`,
-              remark: 'Task Reward',
+              balance_before: oldBal,
+              balance_after: newBal,
+              description: `Claimed Task: ${taskObj.title || taskObj.task_name || 'Task Reward'}`,
               created_at: new Date(),
             },
           }),
@@ -682,32 +676,27 @@ export const spinUserWheel = async (req, res) => {
             prisma.transactions.create({
               data: {
                 user_id: userId,
-                trx: `TRX-${Date.now()}-SPIN`,
+                type: 'SPIN_FEE',
                 amount: costPerSpin,
-                charge: 0,
-                post_balance: oldBal - costPerSpin,
-                type: '-',
-                trx_type: '-',
-                details: 'Paid Lucky Spin Wheel Entry',
-                remark: 'Spin Wheel',
+                balance_before: oldBal,
+                balance_after: oldBal - costPerSpin,
+                description: 'Paid Lucky Spin Wheel Entry',
                 created_at: new Date(),
               },
             })
           );
         }
         if (isWin) {
+          const balBeforeWin = isFree ? oldBal : oldBal - costPerSpin;
           txns.push(
             prisma.transactions.create({
               data: {
                 user_id: userId,
-                trx: `TRX-${Date.now()}-WIN`,
+                type: 'SPIN_WIN',
                 amount: winAmount,
-                charge: 0,
-                post_balance: newBal,
-                type: '+',
-                trx_type: '+',
-                details: `Won ${winningPrize.label} on Lucky Spin Wheel`,
-                remark: 'Spin Win',
+                balance_before: balBeforeWin,
+                balance_after: newBal,
+                description: `Won ${winningPrize.label} on Lucky Spin Wheel`,
                 created_at: new Date(),
               },
             })
