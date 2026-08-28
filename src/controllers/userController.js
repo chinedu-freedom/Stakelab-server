@@ -429,7 +429,7 @@ export const getUserReferralsData = async (req, res) => {
 
     // Fetch active stakes
     const activeStakes = allReferredIds.length > 0
-      ? await prisma.stakes.findMany({
+      ? await prisma.user_stakes.findMany({
           where: {
             user_id: { in: allReferredIds },
             status: 'ACTIVE',

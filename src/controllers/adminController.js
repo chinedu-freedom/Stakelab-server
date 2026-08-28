@@ -917,7 +917,8 @@ export const globalAdminSearch = async (req, res) => {
     const deposits = await prisma.deposits.findMany({
       where: {
         OR: [
-          { trx: { contains: q, mode: 'insensitive' } },
+          { track_id: { contains: q, mode: 'insensitive' } },
+          { transaction_hash: { contains: q, mode: 'insensitive' } },
           { user: { username: { contains: q, mode: 'insensitive' } } },
           { user: { email: { contains: q, mode: 'insensitive' } } },
         ],
@@ -943,7 +944,7 @@ export const globalAdminSearch = async (req, res) => {
     const tickets = await prisma.support_tickets.findMany({
       where: {
         OR: [
-          { ticket_code: { contains: q, mode: 'insensitive' } },
+          { ticket_id: { contains: q, mode: 'insensitive' } },
           { subject: { contains: q, mode: 'insensitive' } },
           { user: { username: { contains: q, mode: 'insensitive' } } },
         ],
