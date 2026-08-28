@@ -90,13 +90,55 @@ export const getAdminStats = async (req, res) => {
       },
     });
 
-    const recentTx = await prisma.transactions.findMany({
-      take: 5,
-      orderBy: { created_at: 'desc' },
-      include: {
-        user: { select: { username: true, full_name: true } },
-      },
-    });
+    const [recentTx, recentUserLogs, recentAdminLogs] = await Promise.all([
+      prisma.transactions.findMany({
+        take: 10,
+        orderBy: { created_at: 'desc' },
+        include: {
+          user: { select: { username: true, full_name: true } },
+        },
+      }),
+      prisma.activity_logs.findMany({
+        take: 10,
+        orderBy: { created_at: 'desc' },
+        include: {
+          user: { select: { username: true, full_name: true } },
+        },
+      }),
+      prisma.admin_logs.findMany({
+        take: 10,
+        orderBy: { created_at: 'desc' },
+        include: {
+          admin: { select: { username: true } },
+        },
+      }),
+    ]);
+
+    const combinedActivities = [
+      ...recentTx.map((t) => ({
+        id: `tx-${t.id}`,
+        userName: t.user?.full_name || t.user?.username || 'User',
+        action: t.type || 'TRANSACTION',
+        details: t.description || `${t.type}: $${parseFloat(t.amount || 0).toFixed(2)}`,
+        createdAt: t.created_at,
+      })),
+      ...recentUserLogs.map((a) => ({
+        id: `act-${a.id}`,
+        userName: a.user?.full_name || a.user?.username || 'User',
+        action: a.action || 'ACTIVITY',
+        details: `User performed ${a.action} action (IP: ${a.ip_address || 'N/A'})`,
+        createdAt: a.created_at,
+      })),
+      ...recentAdminLogs.map((ad) => ({
+        id: `adm-${ad.id}`,
+        userName: ad.admin?.username || 'Admin',
+        action: ad.action || 'ADMIN ACTION',
+        details: `Admin performed ${ad.action}`,
+        createdAt: ad.created_at,
+      })),
+    ]
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 10);
 
     const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const revenueTrendData = [6, 5, 4, 3, 2, 1, 0].map((d) => {
@@ -149,13 +191,7 @@ export const getAdminStats = async (req, res) => {
           createdAt: u.created_at,
           usdBalance: parseFloat(u.balance || 0),
         })),
-        recentActivities: recentTx.map((t) => ({
-          id: t.id,
-          userName: t.user?.full_name || t.user?.username || 'System User',
-          action: t.type || 'TRANSACTION',
-          details: `${t.type}: $${parseFloat(t.amount || 0).toFixed(2)} - ${t.description || 'Processed'}`,
-          createdAt: t.created_at,
-        })),
+        recentActivities: combinedActivities,
         revenueTrendData,
         browserStats: [],
         osStats: [],
