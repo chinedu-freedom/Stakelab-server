@@ -1041,41 +1041,120 @@ let maintenanceStore = {
 };
 
 export const getMaintenanceSettings = async (req, res) => {
-  return res.json({ success: true, settings: maintenanceStore });
+  try {
+    let settingRecord = await prisma.settings.findFirst();
+    if (!settingRecord) {
+      settingRecord = await prisma.settings.create({ data: {} });
+    }
+
+    return res.json({
+      success: true,
+      settings: {
+        isMaintenance: settingRecord.is_maintenance,
+        headline: settingRecord.maintenance_headline,
+        descriptionText: settingRecord.maintenance_description,
+        imageUrl: settingRecord.maintenance_image,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to fetch maintenance settings', error: error.message });
+  }
 };
 
 export const updateMaintenanceSettings = async (req, res) => {
   try {
     const { isMaintenance, headline, descriptionText, imageUrl } = req.body;
-    if (isMaintenance !== undefined) maintenanceStore.isMaintenance = Boolean(isMaintenance);
-    if (headline !== undefined) maintenanceStore.headline = headline;
-    if (descriptionText !== undefined) maintenanceStore.descriptionText = descriptionText;
-    if (imageUrl !== undefined) maintenanceStore.imageUrl = imageUrl;
 
-    return res.json({ success: true, message: 'Maintenance mode settings updated successfully!', settings: maintenanceStore });
+    let settingRecord = await prisma.settings.findFirst();
+    if (!settingRecord) {
+      settingRecord = await prisma.settings.create({
+        data: {
+          is_maintenance: Boolean(isMaintenance),
+          maintenance_headline: headline,
+          maintenance_description: descriptionText,
+          maintenance_image: imageUrl,
+        },
+      });
+    } else {
+      settingRecord = await prisma.settings.update({
+        where: { id: settingRecord.id },
+        data: {
+          ...(isMaintenance !== undefined && { is_maintenance: Boolean(isMaintenance) }),
+          ...(headline !== undefined && { maintenance_headline: headline }),
+          ...(descriptionText !== undefined && { maintenance_description: descriptionText }),
+          ...(imageUrl !== undefined && { maintenance_image: imageUrl }),
+        },
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Maintenance mode settings updated and saved to database successfully!',
+      settings: {
+        isMaintenance: settingRecord.is_maintenance,
+        headline: settingRecord.maintenance_headline,
+        descriptionText: settingRecord.maintenance_description,
+        imageUrl: settingRecord.maintenance_image,
+      },
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to update maintenance settings', error: error.message });
   }
 };
 
-let cookiePolicyStore = {
-  isEnabled: true,
-  shortDescription: 'We may use cookies or any other tracking technologies when you visit our website, including any other media form, mobile website, or mobile application related or connected to help customize the Site and improve your experience.',
-  fullDescription: `What information do we collect?\nWe gather data from you when you register on our site, submit a request, buy any services, react to an overview, or round out a structure.\n\nHow do we protect your information?\nAll provided delicate data is sent through encrypted protocols.\n\nDo we disclose any information to outside parties?\nWe don't sell, exchange, or in any case move to outside gatherings your data.`,
-};
-
 export const getCookiePolicySettings = async (req, res) => {
-  return res.json({ success: true, settings: cookiePolicyStore });
+  try {
+    let settingRecord = await prisma.settings.findFirst();
+    if (!settingRecord) {
+      settingRecord = await prisma.settings.create({ data: {} });
+    }
+
+    return res.json({
+      success: true,
+      settings: {
+        isEnabled: settingRecord.cookie_enabled,
+        shortDescription: settingRecord.cookie_short_description,
+        fullDescription: settingRecord.cookie_full_description,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to fetch cookie settings', error: error.message });
+  }
 };
 
 export const updateCookiePolicySettings = async (req, res) => {
   try {
     const { isEnabled, shortDescription, fullDescription } = req.body;
-    if (isEnabled !== undefined) cookiePolicyStore.isEnabled = Boolean(isEnabled);
-    if (shortDescription !== undefined) cookiePolicyStore.shortDescription = shortDescription;
-    if (fullDescription !== undefined) cookiePolicyStore.fullDescription = fullDescription;
 
-    return res.json({ success: true, message: 'GDPR Cookie settings updated successfully!', settings: cookiePolicyStore });
+    let settingRecord = await prisma.settings.findFirst();
+    if (!settingRecord) {
+      settingRecord = await prisma.settings.create({
+        data: {
+          cookie_enabled: Boolean(isEnabled),
+          cookie_short_description: shortDescription,
+          cookie_full_description: fullDescription,
+        },
+      });
+    } else {
+      settingRecord = await prisma.settings.update({
+        where: { id: settingRecord.id },
+        data: {
+          ...(isEnabled !== undefined && { cookie_enabled: Boolean(isEnabled) }),
+          ...(shortDescription !== undefined && { cookie_short_description: shortDescription }),
+          ...(fullDescription !== undefined && { cookie_full_description: fullDescription }),
+        },
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'GDPR Cookie settings updated and saved to database successfully!',
+      settings: {
+        isEnabled: settingRecord.cookie_enabled,
+        shortDescription: settingRecord.cookie_short_description,
+        fullDescription: settingRecord.cookie_full_description,
+      },
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to update cookie settings', error: error.message });
   }
