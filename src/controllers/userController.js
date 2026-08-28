@@ -132,12 +132,7 @@ export const getPublicRecentActivity = async (req, res) => {
   }
 };
 
-let customHowItWorks = [
-  { num: '1', title: 'Sign Up Account', desc: 'First, you need to sign up for our system.', icon: '/images/step1.png' },
-  { num: '2', title: 'Deposit', desc: 'Then deposit to your wallet.', icon: '/images/step2.png' },
-  { num: '3', title: 'Stake', desc: 'Purchase plan and stake money as per your plan.', icon: '/images/step3.png' },
-  { num: '4', title: 'Withdraw Money', desc: 'Finally, you can withdraw your money.', icon: '/images/step4.png' },
-];
+
 
 let customTestimonials = [
   {
