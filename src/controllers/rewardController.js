@@ -333,19 +333,20 @@ export const updateCheckInsBulk = async (req, res) => {
 };
 
 let userCheckinState = {
-  currentStreak: 1,
+  currentStreak: 0,
   lastClaimDate: null,
 };
 
 export const getUserDailyCheckinStatus = async (req, res) => {
   const todayStr = new Date().toISOString().split('T')[0];
   const isClaimedToday = userCheckinState.lastClaimDate === todayStr;
+  const availableDayNum = userCheckinState.currentStreak + 1;
 
   const rewards = dailyCheckinsStore.map((item) => {
     let status = 'locked';
-    if (item.day_number < userCheckinState.currentStreak) {
+    if (item.day_number <= userCheckinState.currentStreak) {
       status = 'claimed';
-    } else if (item.day_number === userCheckinState.currentStreak) {
+    } else if (item.day_number === availableDayNum) {
       status = isClaimedToday ? 'locked' : 'available';
     } else {
       status = 'locked';
@@ -376,17 +377,12 @@ export const claimUserDailyCheckin = async (req, res) => {
       return res.status(400).json({ success: false, message: "You have already claimed today's daily reward. Please check back tomorrow!" });
     }
 
-    const currentRewardObj = dailyCheckinsStore.find((item) => item.day_number === userCheckinState.currentStreak) || dailyCheckinsStore[0];
+    const dayToClaim = userCheckinState.currentStreak + 1;
+    const currentRewardObj = dailyCheckinsStore.find((item) => item.day_number === dayToClaim) || dailyCheckinsStore[0];
     const rewardAmount = parseFloat(currentRewardObj.reward_amount) || 0.1;
 
     userCheckinState.lastClaimDate = todayStr;
-    const claimedDay = userCheckinState.currentStreak;
-
-    if (userCheckinState.currentStreak >= 7) {
-      userCheckinState.currentStreak = 1;
-    } else {
-      userCheckinState.currentStreak += 1;
-    }
+    userCheckinState.currentStreak = dayToClaim >= 7 ? 0 : dayToClaim;
 
     if (userId) {
       const dbUser = await prisma.users.findUnique({ where: { id: userId } });
@@ -405,7 +401,7 @@ export const claimUserDailyCheckin = async (req, res) => {
               amount: rewardAmount,
               balance_before: oldBal,
               balance_after: newBal,
-              description: `Daily Check-In Reward (Day ${claimedDay})`,
+              description: `Daily Check-In Reward (Day ${dayToClaim})`,
               created_at: new Date(),
             },
           }),
@@ -415,9 +411,9 @@ export const claimUserDailyCheckin = async (req, res) => {
 
     return res.json({
       success: true,
-      message: `Day ${claimedDay} reward of $${rewardAmount.toFixed(2)} claimed successfully and credited to your balance!`,
+      message: `Day ${dayToClaim} reward of $${rewardAmount.toFixed(2)} claimed successfully and credited to your balance!`,
       amount: rewardAmount,
-      claimedDay,
+      claimedDay: dayToClaim,
       nextStreakDay: userCheckinState.currentStreak,
     });
   } catch (err) {
