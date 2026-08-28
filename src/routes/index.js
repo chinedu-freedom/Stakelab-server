@@ -55,6 +55,8 @@ import {
   globalAdminSearch,
   getGeneralSettings,
   updateGeneralSettings,
+  getAppDownloadInfo,
+  downloadAppApk,
   getLogoFaviconSettings,
   updateLogoFaviconSettings,
   getMaintenanceSettings,
@@ -178,6 +180,8 @@ router.post('/admin/password', authenticateAdmin, adminChangePassword);
 router.get('/admin/global-search', authenticateAdmin, globalAdminSearch);
 router.get('/admin/general-setting', authenticateAdmin, getGeneralSettings);
 router.post('/admin/general-setting', authenticateAdmin, updateGeneralSettings);
+router.get('/user/app-download-info', getAppDownloadInfo);
+router.get('/app-download', downloadAppApk);
 router.get('/admin/logo-favicon', authenticateAdmin, getLogoFaviconSettings);
 router.post('/admin/logo-favicon', authenticateAdmin, updateLogoFaviconSettings);
 router.get('/public/maintenance-mode', getMaintenanceSettings);

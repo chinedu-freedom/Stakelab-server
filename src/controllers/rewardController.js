@@ -1,4 +1,5 @@
 // Reward & Gamification Suite Controllers for EverStake
+import { prisma } from '../config/db.js';
 
 let giftCodesStore = [
   {
@@ -367,6 +368,7 @@ export const getUserDailyCheckinStatus = async (req, res) => {
 
 export const claimUserDailyCheckin = async (req, res) => {
   try {
+    const userId = req.user?.id;
     const todayStr = new Date().toISOString().split('T')[0];
     if (userCheckinState.lastClaimDate === todayStr) {
       return res.status(400).json({ success: false, message: "You have already claimed today's daily reward. Please check back tomorrow!" });
@@ -384,9 +386,37 @@ export const claimUserDailyCheckin = async (req, res) => {
       userCheckinState.currentStreak += 1;
     }
 
+    if (userId) {
+      const dbUser = await prisma.users.findUnique({ where: { id: userId } });
+      if (dbUser) {
+        const oldBal = parseFloat(dbUser.balance || 0);
+        const newBal = oldBal + rewardAmount;
+        await prisma.$transaction([
+          prisma.users.update({
+            where: { id: userId },
+            data: { balance: newBal },
+          }),
+          prisma.transactions.create({
+            data: {
+              user_id: userId,
+              trx: `TRX-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+              amount: rewardAmount,
+              charge: 0,
+              post_balance: newBal,
+              type: '+',
+              trx_type: '+',
+              details: `Daily Check-In Reward (Day ${claimedDay})`,
+              remark: 'Daily Check-In',
+              created_at: new Date(),
+            },
+          }),
+        ]);
+      }
+    }
+
     return res.json({
       success: true,
-      message: `Day ${claimedDay} reward of $${rewardAmount.toFixed(2)} claimed successfully!`,
+      message: `Day ${claimedDay} reward of $${rewardAmount.toFixed(2)} claimed successfully and credited to your balance!`,
       amount: rewardAmount,
       claimedDay,
       nextStreakDay: userCheckinState.currentStreak,
@@ -531,6 +561,7 @@ export const getUserTasks = async (req, res) => {
 export const claimUserTask = async (req, res) => {
   try {
     const { taskId } = req.body;
+    const userId = req.user?.id;
     const userEmail = req.user?.email || 'user@example.com';
 
     const taskObj = tasksStore.find((t) => t.id === taskId);
@@ -543,6 +574,8 @@ export const claimUserTask = async (req, res) => {
       return res.status(400).json({ success: false, message: 'You have already claimed this task reward.' });
     }
 
+    const rewardAmount = parseFloat(taskObj.reward_amount || 0);
+
     userTasksClaimsStore.push({
       taskId,
       userEmail,
@@ -550,10 +583,38 @@ export const claimUserTask = async (req, res) => {
     });
     taskObj.claims_count = (taskObj.claims_count || 0) + 1;
 
+    if (userId) {
+      const dbUser = await prisma.users.findUnique({ where: { id: userId } });
+      if (dbUser) {
+        const oldBal = parseFloat(dbUser.balance || 0);
+        const newBal = oldBal + rewardAmount;
+        await prisma.$transaction([
+          prisma.users.update({
+            where: { id: userId },
+            data: { balance: newBal },
+          }),
+          prisma.transactions.create({
+            data: {
+              user_id: userId,
+              trx: `TRX-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+              amount: rewardAmount,
+              charge: 0,
+              post_balance: newBal,
+              type: '+',
+              trx_type: '+',
+              details: `Claimed Task: ${taskObj.title || taskObj.task_name || 'Task Reward'}`,
+              remark: 'Task Reward',
+              created_at: new Date(),
+            },
+          }),
+        ]);
+      }
+    }
+
     return res.json({
       success: true,
-      message: `Task reward of $${parseFloat(taskObj.reward_amount).toFixed(2)} claimed successfully!`,
-      amount: taskObj.reward_amount,
+      message: `Task reward of $${rewardAmount.toFixed(2)} claimed successfully and credited to your balance!`,
+      amount: rewardAmount,
     });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Failed to claim task reward', error: err.message });
@@ -572,26 +633,95 @@ export const getUserSpinInfo = async (req, res) => {
 
 export const spinUserWheel = async (req, res) => {
   try {
+    const userId = req.user?.id;
+    const costPerSpin = parseFloat(spinSettingsStore.cost_per_spin || 5);
+    let isFree = false;
+
     if (userFreeSpinsCount > 0) {
       userFreeSpinsCount -= 1;
+      isFree = true;
+    }
+
+    if (userId && !isFree) {
+      const dbUser = await prisma.users.findUnique({ where: { id: userId } });
+      if (!dbUser || parseFloat(dbUser.balance || 0) < costPerSpin) {
+        return res.status(400).json({ success: false, message: `Insufficient balance to spin wheel. Each spin costs $${costPerSpin.toFixed(2)}.` });
+      }
     }
 
     const randomIndex = Math.floor(Math.random() * spinPrizesStore.length);
     const winningPrize = spinPrizesStore[randomIndex] || spinPrizesStore[0];
     const isWin = winningPrize.amount > 0;
+    const winAmount = parseFloat(winningPrize.amount || 0);
 
     const newWin = {
       id: `win-${Date.now()}`,
       prize: { name: winningPrize.label },
-      reward_earned: winningPrize.amount,
-      spin_type: userFreeSpinsCount >= 0 ? 'free' : 'paid',
+      reward_earned: winAmount,
+      spin_type: isFree ? 'free' : 'paid',
       created_at: new Date().toISOString(),
     };
     userRecentSpinWins.unshift(newWin);
 
     spinSettingsStore.total_spins_used += 1;
     if (isWin) {
-      spinSettingsStore.total_rewards_earned += winningPrize.amount;
+      spinSettingsStore.total_rewards_earned += winAmount;
+    }
+
+    if (userId) {
+      const dbUser = await prisma.users.findUnique({ where: { id: userId } });
+      if (dbUser) {
+        const oldBal = parseFloat(dbUser.balance || 0);
+        let newBal = oldBal;
+        if (!isFree) newBal -= costPerSpin;
+        if (isWin) newBal += winAmount;
+
+        const txns = [];
+        if (!isFree) {
+          txns.push(
+            prisma.transactions.create({
+              data: {
+                user_id: userId,
+                trx: `TRX-${Date.now()}-SPIN`,
+                amount: costPerSpin,
+                charge: 0,
+                post_balance: oldBal - costPerSpin,
+                type: '-',
+                trx_type: '-',
+                details: 'Paid Lucky Spin Wheel Entry',
+                remark: 'Spin Wheel',
+                created_at: new Date(),
+              },
+            })
+          );
+        }
+        if (isWin) {
+          txns.push(
+            prisma.transactions.create({
+              data: {
+                user_id: userId,
+                trx: `TRX-${Date.now()}-WIN`,
+                amount: winAmount,
+                charge: 0,
+                post_balance: newBal,
+                type: '+',
+                trx_type: '+',
+                details: `Won ${winningPrize.label} on Lucky Spin Wheel`,
+                remark: 'Spin Win',
+                created_at: new Date(),
+              },
+            })
+          );
+        }
+
+        await prisma.$transaction([
+          prisma.users.update({
+            where: { id: userId },
+            data: { balance: newBal },
+          }),
+          ...txns,
+        ]);
+      }
     }
 
     return res.json({
@@ -599,7 +729,7 @@ export const spinUserWheel = async (req, res) => {
       winningIndex: randomIndex,
       prize: winningPrize,
       isWin,
-      amount: winningPrize.amount,
+      amount: winAmount,
       message: isWin
         ? `Congratulations! You won ${winningPrize.label}!`
         : 'Better luck next time!',

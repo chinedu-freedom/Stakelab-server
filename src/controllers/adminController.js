@@ -955,6 +955,10 @@ let logoFaviconStore = {
   faviconUrl: null,
 };
 
+let inMemoryGeneralSettings = {
+  appDownloadUrl: '/api/app-download',
+};
+
 export const getGeneralSettings = async (req, res) => {
   try {
     let settingRecord = await prisma.settings.findFirst();
@@ -976,6 +980,7 @@ export const getGeneralSettings = async (req, res) => {
         timezone: 'UTC',
         registrationBonus: 0.0,
         logoUrl: settingRecord.site_logo,
+        appDownloadUrl: inMemoryGeneralSettings.appDownloadUrl || '/api/app-download',
       },
     });
   } catch (error) {
@@ -985,7 +990,11 @@ export const getGeneralSettings = async (req, res) => {
 
 export const updateGeneralSettings = async (req, res) => {
   try {
-    const { siteTitle, currency, currencySymbol, logoUrl } = req.body;
+    const { siteTitle, currency, currencySymbol, logoUrl, appDownloadUrl } = req.body;
+
+    if (appDownloadUrl) {
+      inMemoryGeneralSettings.appDownloadUrl = appDownloadUrl;
+    }
 
     let settingRecord = await prisma.settings.findFirst();
     if (!settingRecord) {
@@ -1018,11 +1027,29 @@ export const updateGeneralSettings = async (req, res) => {
         timezone: 'UTC',
         registrationBonus: 0.0,
         logoUrl: settingRecord.site_logo,
+        appDownloadUrl: inMemoryGeneralSettings.appDownloadUrl || '/api/app-download',
       },
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to update general settings', error: error.message });
   }
+};
+
+export const getAppDownloadInfo = async (req, res) => {
+  return res.json({
+    success: true,
+    appDownloadUrl: inMemoryGeneralSettings.appDownloadUrl || '/api/app-download',
+    appName: 'EverStake Mobile App',
+    version: 'v2.4.0',
+    fileSize: '24.5 MB',
+  });
+};
+
+export const downloadAppApk = (req, res) => {
+  const dummyApkContent = Buffer.from('PK\x03\x04\x14\x00\x08\x00\x08\x00EverStake Mobile Android Application v2.4.0 (Release Build)');
+  res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+  res.setHeader('Content-Disposition', 'attachment; filename="EverStake-v2.4.0.apk"');
+  return res.send(dummyApkContent);
 };
 
 export const getLogoFaviconSettings = async (req, res) => {
