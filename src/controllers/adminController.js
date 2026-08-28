@@ -12,9 +12,13 @@ export const getAdminStats = async (req, res) => {
     const activeUsers = await prisma.users.count({ where: { is_active: true } });
     const todayUsers = await prisma.users.count({ where: { created_at: { gte: todayStart } } });
     const emailUnverified = await prisma.users.count({ where: { email_verified: false } });
-    const mobileUnverified = await prisma.users.count({ where: { mobile: null } });
+    const mobileUnverified = await prisma.users.count({
+      where: {
+        OR: [{ mobile: null }, { mobile: '' }],
+      },
+    });
     const kycUnverified = await prisma.users.count({ where: { profile_complete: false } });
-    const kycPending = await prisma.users.count({ where: { profile_complete: true } });
+    const kycPending = await prisma.users.count({ where: { profile_complete: false } });
 
     const totalDepositsAgg = await prisma.deposits.aggregate({
       where: { status: 'APPROVED' },
@@ -597,7 +601,13 @@ export const getAdminUsers = async (req, res) => {
     const where = {};
     if (status === 'banned') where.is_active = false;
     if (status === 'active') where.is_active = true;
-    if (filter === 'email_unverified') where.email_verified = false;
+    if (filter === 'email_unverified' || filter === 'email-unverified') where.email_verified = false;
+    if (filter === 'mobile_unverified' || filter === 'mobile-unverified') {
+      where.OR = [{ mobile: null }, { mobile: '' }];
+    }
+    if (filter === 'kyc_unverified' || filter === 'kyc-unverified' || filter === 'kyc_pending' || filter === 'kyc-pending') {
+      where.profile_complete = false;
+    }
 
     const users = await prisma.users.findMany({
       where,
@@ -619,7 +629,14 @@ export const getAdminUsers = async (req, res) => {
       },
     });
 
-    return res.json({ success: true, users });
+    const mappedUsers = users.map((u) => ({
+      ...u,
+      name: u.full_name || u.username || 'User',
+      mobile_verified: !!(u.mobile && u.mobile.trim() !== ''),
+      kyc_status: u.profile_complete ? 'verified' : 'unverified',
+    }));
+
+    return res.json({ success: true, users: mappedUsers });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to fetch users', error: error.message });
   }
