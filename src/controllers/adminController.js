@@ -375,7 +375,7 @@ export const rejectWithdrawal = async (req, res) => {
 
 export const createStakingPlan = async (req, res) => {
   try {
-    const { title, badge, min_amount, max_amount, apy_percent, daily_return_percent, duration_days, capital_return } = req.body;
+    const { title, badge, min_amount, max_amount, apy_percent, daily_return_percent, duration_days, capital_return, tier } = req.body;
 
     const plan = await prisma.staking_plans.create({
       data: {
@@ -386,6 +386,7 @@ export const createStakingPlan = async (req, res) => {
         apy_percent: parseFloat(apy_percent || 0),
         daily_return_percent: parseFloat(daily_return_percent),
         duration_days: parseInt(duration_days),
+        tier: tier || 'Flexible Tier',
         capital_return: capital_return !== undefined ? capital_return : true,
       },
     });
@@ -399,7 +400,7 @@ export const createStakingPlan = async (req, res) => {
 export const updateStakingPlan = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, badge, min_amount, max_amount, apy_percent, daily_return_percent, duration_days, is_active } = req.body;
+    const { title, badge, min_amount, max_amount, apy_percent, daily_return_percent, duration_days, capital_return, tier, is_active } = req.body;
 
     const updated = await prisma.staking_plans.update({
       where: { id },
@@ -411,6 +412,8 @@ export const updateStakingPlan = async (req, res) => {
         ...(apy_percent !== undefined && { apy_percent: parseFloat(apy_percent) }),
         ...(daily_return_percent !== undefined && { daily_return_percent: parseFloat(daily_return_percent) }),
         ...(duration_days !== undefined && { duration_days: parseInt(duration_days) }),
+        ...(tier !== undefined && { tier }),
+        ...(capital_return !== undefined && { capital_return: Boolean(capital_return) }),
         ...(is_active !== undefined && { is_active: Boolean(is_active) }),
       },
     });

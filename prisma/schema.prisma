@@ -77,6 +77,7 @@ model staking_plans {
   apy_percent         Decimal      @db.Decimal(5, 2)
   daily_return_percent Decimal     @db.Decimal(5, 2)
   duration_days       Int          // lockup period in days (0 for flexible)
+  tier                String       @default("Flexible Tier") // "Flexible Tier" or "Dynamic Tier"
   capital_return      Boolean      @default(true)
   is_active           Boolean      @default(true)
   sort_order          Int          @default(0)
