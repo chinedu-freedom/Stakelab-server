@@ -48,6 +48,7 @@ import {
   getAdminTransactions,
   impersonateUser,
   updateAdminUserDetail,
+  deleteAdminUser,
   getAdminStakingHistory,
   getReferralSettings,
   updateReferralSettings,
@@ -171,6 +172,7 @@ router.post('/admin/users/:id/impersonate', authenticateAdmin, impersonateUser);
 router.get('/admin/users', authenticateAdmin, getAdminUsers);
 router.get('/admin/users/:id', authenticateAdmin, getAdminUserDetail);
 router.put('/admin/users/:id', authenticateAdmin, updateAdminUserDetail);
+router.delete('/admin/users/:id', authenticateAdmin, deleteAdminUser);
 router.get('/admin/transactions', authenticateAdmin, getAdminTransactions);
 router.get('/admin/staking-history', authenticateAdmin, getAdminStakingHistory);
 router.get('/public/referral-settings', getReferralSettings);

@@ -474,6 +474,32 @@ export const deleteStakingPlan = async (req, res) => {
   }
 };
 
+export const deleteAdminUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await prisma.users.findUnique({ where: { id } });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    await prisma.users.updateMany({
+      where: { referred_by: id },
+      data: { referred_by: null },
+    });
+
+    await prisma.users.delete({
+      where: { id },
+    });
+
+    return res.json({
+      success: true,
+      message: `User ${user.full_name || user.email} deleted successfully!`,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to delete user', error: error.message });
+  }
+};
+
 export const updateEmailSettings = async (req, res) => {
   try {
     const { smtp_host, smtp_port, smtp_user, smtp_pass, from_email, from_name } = req.body;
