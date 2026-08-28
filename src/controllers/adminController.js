@@ -697,11 +697,14 @@ export const getAdminUserDetail = async (req, res) => {
 
 export const getAdminTransactions = async (req, res) => {
   try {
-    const { type } = req.query;
+    const { type, userId } = req.query;
 
     const where = {};
     if (type && type !== 'All') {
       where.type = type;
+    }
+    if (userId) {
+      where.user_id = userId;
     }
 
     const transactions = await prisma.transactions.findMany({

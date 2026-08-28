@@ -26,24 +26,43 @@ export const getUserDashboardData = async (req, res) => {
       },
     });
 
-    const activeStakes = await prisma.user_stakes.findMany({
-      where: { user_id: userId, status: 'ACTIVE' },
-      include: { plan: true },
-    });
+    const [depositAgg, withdrawAgg, refEarningsAgg, referralCount, activeStakes, recentTransactions] = await Promise.all([
+      prisma.deposits.aggregate({
+        where: { user_id: userId, status: 'APPROVED' },
+        _sum: { amount: true },
+      }),
+      prisma.withdrawals.aggregate({
+        where: { user_id: userId, status: 'APPROVED' },
+        _sum: { amount: true },
+      }),
+      prisma.transactions.aggregate({
+        where: { user_id: userId, remark: { contains: 'referral', mode: 'insensitive' } },
+        _sum: { amount: true },
+      }),
+      prisma.users.count({
+        where: { referred_by: userId },
+      }),
+      prisma.user_stakes.findMany({
+        where: { user_id: userId, status: 'ACTIVE' },
+        include: { plan: true },
+      }),
+      prisma.transactions.findMany({
+        where: { user_id: userId },
+        take: 10,
+        orderBy: { created_at: 'desc' },
+      }),
+    ]);
 
-    const recentTransactions = await prisma.transactions.findMany({
-      where: { user_id: userId },
-      take: 10,
-      orderBy: { created_at: 'desc' },
-    });
-
-    const referralCount = await prisma.users.count({
-      where: { referred_by: userId },
-    });
+    const fullUser = {
+      ...user,
+      total_deposit: depositAgg._sum.amount || 0,
+      total_withdraw: withdrawAgg._sum.amount || 0,
+      referral_earning: refEarningsAgg._sum.amount || 0,
+    };
 
     return res.json({
       success: true,
-      user,
+      user: fullUser,
       activeStakes,
       recentTransactions,
       referralCount,
