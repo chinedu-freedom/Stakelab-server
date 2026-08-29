@@ -1,4 +1,5 @@
 import { prisma } from '../config/db.js';
+import { sendEmail } from '../services/emailService.js';
 
 export const getUserDashboardData = async (req, res) => {
   try {
@@ -543,15 +544,15 @@ export const sendSecurityPinOtp = async (req, res) => {
     await prisma.users.update({
       where: { id: userId },
       data: {
-        otp_secret: otpCode,
-        otp_expires_at: expiresAt,
+        email_verify_code: otpCode,
+        email_verify_expires: expiresAt,
       },
     });
 
     sendEmail({
       to: user.email,
-      subject: '🔑 Security PIN Setup / Reset Code - StakeLab',
-      html: `<h2>Security PIN Reset Request</h2><p>Your 6-digit verification code is: <b style="font-size:20px;color:#ff0044;">${otpCode}</b></p><p>This code expires in 10 minutes.</p>`,
+      subject: 'Security PIN Verification Code',
+      html: `Your 6-digit verification code is ${otpCode}`,
       emailType: 'PIN_RESET_OTP',
       userId,
     });
@@ -574,10 +575,10 @@ export const updateSecurityPin = async (req, res) => {
     const user = await prisma.users.findUnique({ where: { id: userId } });
 
     if (otp_code) {
-      if (user.otp_secret !== otp_code) {
+      if (user.email_verify_code !== otp_code) {
         return res.status(400).json({ success: false, message: 'Invalid verification OTP code' });
       }
-      if (user.otp_expires_at && new Date() > new Date(user.otp_expires_at)) {
+      if (user.email_verify_expires && new Date() > new Date(user.email_verify_expires)) {
         return res.status(400).json({ success: false, message: 'OTP code has expired' });
       }
     }
@@ -586,8 +587,8 @@ export const updateSecurityPin = async (req, res) => {
       where: { id: userId },
       data: {
         withdrawal_pin: new_pin,
-        otp_secret: null,
-        otp_expires_at: null,
+        email_verify_code: null,
+        email_verify_expires: null,
       },
     });
 

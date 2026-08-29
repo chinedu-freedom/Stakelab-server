@@ -262,8 +262,8 @@ export const approveDeposit = async (req, res) => {
 
     sendEmail({
       to: deposit.user.email,
-      subject: 'Deposit Approved - Stakelab',
-      html: `<h2>Deposit Approved!</h2><p>Your deposit of $${deposit.amount} has been approved and credited to your account balance.</p>`,
+      subject: 'Deposit Approved',
+      html: `<h2>Deposit Approved</h2><p>Your deposit of $${deposit.amount} has been approved and credited to your account balance.</p>`,
       emailType: 'DEPOSIT_APPROVED',
       userId: deposit.user_id,
     });
@@ -347,7 +347,7 @@ export const approveWithdrawal = async (req, res) => {
 
     sendEmail({
       to: withdrawal.user.email,
-      subject: 'Withdrawal Approved - Stakelab',
+      subject: 'Withdrawal Approved',
       html: `<h2>Withdrawal Sent!</h2><p>Your withdrawal request for $${withdrawal.net_amount} has been processed to your address: ${withdrawal.wallet_address}</p>`,
       emailType: 'WITHDRAWAL_APPROVED',
       userId: withdrawal.user_id,
@@ -401,7 +401,7 @@ export const rejectWithdrawal = async (req, res) => {
 
     sendEmail({
       to: withdrawal.user.email,
-      subject: 'Withdrawal Rejected & Refunded - Stakelab',
+      subject: 'Withdrawal Rejected',
       html: `<h2>Withdrawal Rejected</h2><p>Your withdrawal of $${withdrawal.amount} was rejected and refunded to your balance. Reason: ${reason || 'Security check'}</p>`,
       emailType: 'WITHDRAWAL_REJECTED',
       userId: withdrawal.user_id,

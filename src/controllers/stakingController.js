@@ -1,4 +1,5 @@
 import { prisma } from '../config/db.js';
+import { sendEmail } from '../services/emailService.js';
 
 export const getStakingPlans = async (req, res) => {
   try {
