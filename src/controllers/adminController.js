@@ -812,7 +812,7 @@ export const getAdminStakingHistory = async (req, res) => {
       orderBy: { created_at: 'desc' },
       include: {
         user: { select: { id: true, username: true, full_name: true, email: true } },
-        plan: { select: { name: true } },
+        plan: { select: { title: true, badge: true, daily_return_percent: true, duration_days: true } },
       },
     });
 
