@@ -348,7 +348,10 @@ export const deleteTask = async (req, res) => {
 export const getDailyCheckins = async (req, res) => {
   return res.json({ success: true, checkins: dailyCheckinsStore });
 };
-export const getCheckIns = getDailyCheckins;
+
+export const getCheckIns = async (req, res) => {
+  return res.json({ success: true, checkins: dailyCheckinsStore });
+};
 
 export const updateDailyCheckins = async (req, res) => {
   try {
@@ -360,7 +363,10 @@ export const updateDailyCheckins = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to save daily check-in settings', error: err.message });
   }
 };
-export const updateCheckInsBulk = updateDailyCheckins;
+
+export const updateCheckInsBulk = async (req, res) => {
+  return updateDailyCheckins(req, res);
+};
 
 let userCheckinState = {
   currentStreak: 0,
