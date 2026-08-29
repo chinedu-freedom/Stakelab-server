@@ -37,7 +37,7 @@ export const getUserDashboardData = async (req, res) => {
         _sum: { amount: true },
       }),
       prisma.transactions.aggregate({
-        where: { user_id: userId, remark: { contains: 'referral', mode: 'insensitive' } },
+        where: { user_id: userId, OR: [{ type: 'REFERRAL_COMMISSION' }, { description: { contains: 'referral', mode: 'insensitive' } }] },
         _sum: { amount: true },
       }),
       prisma.users.count({

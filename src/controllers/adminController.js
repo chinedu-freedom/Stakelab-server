@@ -221,7 +221,7 @@ export const getAdminDeposits = async (req, res) => {
 export const approveDeposit = async (req, res) => {
   try {
     const { id } = req.params;
-    const adminId = req.admin.id;
+    const adminId = req.admin?.id || null;
 
     const deposit = await prisma.deposits.findUnique({
       where: { id },
@@ -325,7 +325,7 @@ export const getAdminWithdrawals = async (req, res) => {
 export const approveWithdrawal = async (req, res) => {
   try {
     const { id } = req.params;
-    const adminId = req.admin.id;
+    const adminId = req.admin?.id || null;
 
     const withdrawal = await prisma.withdrawals.findUnique({
       where: { id },
