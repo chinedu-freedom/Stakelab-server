@@ -255,21 +255,23 @@ export const claimGiftCode = async (req, res) => {
     if (userId) {
       const dbUser = await prisma.users.findUnique({ where: { id: userId } });
       if (dbUser) {
+        const oldBal = parseFloat(dbUser.balance || 0);
         const oldEarned = parseFloat(dbUser.total_earned || 0);
         const rewardAmt = parseFloat(foundCode.amount || 0);
+        const newBal = oldBal + rewardAmt;
         const newEarned = oldEarned + rewardAmt;
         await prisma.$transaction([
           prisma.users.update({
             where: { id: userId },
-            data: { total_earned: newEarned },
+            data: { balance: newBal, total_earned: newEarned },
           }),
           prisma.transactions.create({
             data: {
               user_id: userId,
               type: 'GIFT_BONUS',
               amount: rewardAmt,
-              balance_before: oldEarned,
-              balance_after: newEarned,
+              balance_before: oldBal,
+              balance_after: newBal,
               description: `Claimed Gift Code: ${foundCode.code}`,
               created_at: new Date(),
             },
@@ -343,19 +345,18 @@ export const deleteTask = async (req, res) => {
 };
 
 // --- Daily Check-Ins Controllers ---
-export const getCheckIns = async (req, res) => {
+export const getDailyCheckins = async (req, res) => {
   return res.json({ success: true, checkins: dailyCheckinsStore });
 };
 
-export const updateCheckInsBulk = async (req, res) => {
+export const updateDailyCheckins = async (req, res) => {
   try {
-    const { checkins } = req.body;
-    if (Array.isArray(checkins)) {
-      dailyCheckinsStore = checkins;
+    if (Array.isArray(req.body.checkins)) {
+      dailyCheckinsStore = req.body.checkins;
     }
-    return res.json({ success: true, message: 'Daily check-in streak rewards updated successfully!', checkins: dailyCheckinsStore });
+    return res.json({ success: true, message: 'Daily check-in configuration saved!', checkins: dailyCheckinsStore });
   } catch (err) {
-    return res.status(500).json({ success: false, message: 'Failed to update check-ins', error: err.message });
+    return res.status(500).json({ success: false, message: 'Failed to save daily check-in settings', error: err.message });
   }
 };
 
@@ -414,20 +415,22 @@ export const claimUserDailyCheckin = async (req, res) => {
     if (userId) {
       const dbUser = await prisma.users.findUnique({ where: { id: userId } });
       if (dbUser) {
+        const oldBal = parseFloat(dbUser.balance || 0);
         const oldEarned = parseFloat(dbUser.total_earned || 0);
+        const newBal = oldBal + rewardAmount;
         const newEarned = oldEarned + rewardAmount;
         await prisma.$transaction([
           prisma.users.update({
             where: { id: userId },
-            data: { total_earned: newEarned },
+            data: { balance: newBal, total_earned: newEarned },
           }),
           prisma.transactions.create({
             data: {
               user_id: userId,
               type: 'DAILY_CHECKIN',
               amount: rewardAmount,
-              balance_before: oldEarned,
-              balance_after: newEarned,
+              balance_before: oldBal,
+              balance_after: newBal,
               description: `Daily Check-In Reward (Day ${dayToClaim})`,
               created_at: new Date(),
             },
@@ -619,20 +622,22 @@ export const claimUserTask = async (req, res) => {
     if (userId) {
       const dbUser = await prisma.users.findUnique({ where: { id: userId } });
       if (dbUser) {
+        const oldBal = parseFloat(dbUser.balance || 0);
         const oldEarned = parseFloat(dbUser.total_earned || 0);
+        const newBal = oldBal + rewardAmount;
         const newEarned = oldEarned + rewardAmount;
         await prisma.$transaction([
           prisma.users.update({
             where: { id: userId },
-            data: { total_earned: newEarned },
+            data: { balance: newBal, total_earned: newEarned },
           }),
           prisma.transactions.create({
             data: {
               user_id: userId,
               type: 'TASK_REWARD',
               amount: rewardAmount,
-              balance_before: oldEarned,
-              balance_after: newEarned,
+              balance_before: oldBal,
+              balance_after: newBal,
               description: `Claimed Task: ${taskObj.title || taskObj.task_name || 'Task Reward'}`,
               created_at: new Date(),
             },
@@ -732,7 +737,10 @@ export const spinUserWheel = async (req, res) => {
         let newEarned = oldEarned;
 
         if (!isFree) newBal -= costPerSpin;
-        if (isWin) newEarned += winAmount;
+        if (isWin) {
+          newBal += winAmount;
+          newEarned += winAmount;
+        }
 
         const txns = [];
         if (!isFree) {
