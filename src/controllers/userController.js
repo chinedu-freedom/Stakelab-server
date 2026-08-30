@@ -78,7 +78,7 @@ export const getUserDashboardData = async (req, res) => {
 export const updateUserData = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { username, country, mobile, address, state, zip_code, city } = req.body;
+    const { username, full_name, country, mobile, address, state, zip_code, city, profile_image } = req.body;
 
     if (!country || !mobile || !address || !state || !zip_code || !city) {
       return res.status(400).json({ success: false, message: 'All fields are required' });
@@ -88,6 +88,7 @@ export const updateUserData = async (req, res) => {
       where: { id: userId },
       data: {
         ...(username ? { username } : {}),
+        ...(full_name ? { full_name } : {}),
         country,
         mobile,
         address,
@@ -95,6 +96,7 @@ export const updateUserData = async (req, res) => {
         zip_code,
         city,
         profile_complete: true,
+        ...(profile_image !== undefined && { profile_image }),
       },
     });
 

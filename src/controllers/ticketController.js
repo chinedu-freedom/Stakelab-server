@@ -65,13 +65,15 @@ export const getUserTickets = async (req, res) => {
 export const getTicketById = async (req, res) => {
   try {
     const { id } = req.params;
+    const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id);
 
     const ticket = await prisma.support_tickets.findFirst({
       where: {
         OR: [
-          { id },
+          ...(isUuid ? [{ id }] : []),
           { ticket_id: id.startsWith('#') ? id : `#${id}` },
           { ticket_id: id },
+          { ticket_id: id.replace(/^#/, '') },
         ],
       },
       include: {
@@ -99,19 +101,22 @@ export const replyTicket = async (req, res) => {
     const { id } = req.params;
     const { message } = req.body;
     const isAdmin = !!req.admin;
-    const senderName = isAdmin ? (req.admin.username || 'Admin Support') : (req.user.full_name || req.user.username || 'User');
+    const senderName = isAdmin ? (req.admin?.username || 'Admin Support') : (req.user?.full_name || req.user?.username || 'User');
     const senderType = isAdmin ? 'ADMIN' : 'USER';
 
     if (!message) {
       return res.status(400).json({ success: false, message: 'Message text is required' });
     }
 
+    const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id);
+
     const ticket = await prisma.support_tickets.findFirst({
       where: {
         OR: [
-          { id },
+          ...(isUuid ? [{ id }] : []),
           { ticket_id: id.startsWith('#') ? id : `#${id}` },
           { ticket_id: id },
+          { ticket_id: id.replace(/^#/, '') },
         ],
       },
     });

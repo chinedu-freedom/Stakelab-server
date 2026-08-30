@@ -31,6 +31,7 @@ export const authenticateUser = async (req, res, next) => {
         profile_complete: true,
         email_verified: true,
         is_active: true,
+        profile_image: true,
       },
     });
 
