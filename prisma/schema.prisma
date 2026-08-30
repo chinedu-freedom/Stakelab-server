@@ -256,6 +256,13 @@ model settings {
   withdrawal_charge        Decimal  @default(1) @db.Decimal(5, 2)
   referral_commission      Decimal  @default(5) @db.Decimal(5, 2)
   telegram_support         String?  @default("https://t.me/stakelab_support")
+  is_maintenance           Boolean  @default(false)
+  maintenance_headline     String?  @default("System Maintenance Underway")
+  maintenance_description  String?  @default("We are upgrading our platform for better stability.")
+  maintenance_image        String?
+  cookie_enabled           Boolean  @default(true)
+  cookie_short_description String?  @default("We use cookies to improve your experience.")
+  cookie_full_description  String?  @default("We use essential cookies to maintain user session security.")
   updated_at               DateTime @updatedAt
 
   @@map("settings")

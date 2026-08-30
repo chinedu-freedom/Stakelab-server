@@ -838,6 +838,14 @@ let referralConfigStore = {
 };
 
 export const getReferralSettings = async (req, res) => {
+  try {
+    const s = await prisma.settings.findFirst();
+    if (s && s.referral_commission !== null) {
+      const topComm = parseFloat(s.referral_commission);
+      if (referralConfigStore.depositLevels[0]) referralConfigStore.depositLevels[0].percent = topComm;
+      if (referralConfigStore.stakingLevels[0]) referralConfigStore.stakingLevels[0].percent = topComm;
+    }
+  } catch (e) {}
   return res.json({ success: true, referralSettings: referralConfigStore });
 };
 
@@ -857,6 +865,19 @@ export const updateReferralSettings = async (req, res) => {
         level: Number(s.level),
         percent: parseFloat(s.percent || 0),
       }));
+    }
+
+    const topComm = referralConfigStore.depositLevels[0]?.percent || referralConfigStore.stakingLevels[0]?.percent || 5;
+    const existing = await prisma.settings.findFirst();
+    if (existing) {
+      await prisma.settings.update({
+        where: { id: existing.id },
+        data: { referral_commission: parseFloat(topComm) },
+      });
+    } else {
+      await prisma.settings.create({
+        data: { referral_commission: parseFloat(topComm) },
+      });
     }
 
     return res.json({
@@ -1151,6 +1172,15 @@ let maintenanceStore = {
 };
 
 export const getMaintenanceSettings = async (req, res) => {
+  try {
+    const s = await prisma.settings.findFirst();
+    if (s) {
+      maintenanceStore.isMaintenance = Boolean(s.is_maintenance);
+      if (s.maintenance_headline) maintenanceStore.headline = s.maintenance_headline;
+      if (s.maintenance_description) maintenanceStore.descriptionText = s.maintenance_description;
+      if (s.maintenance_image) maintenanceStore.imageUrl = s.maintenance_image;
+    }
+  } catch (e) {}
   return res.json({ success: true, settings: maintenanceStore });
 };
 
@@ -1161,6 +1191,28 @@ export const updateMaintenanceSettings = async (req, res) => {
     if (headline !== undefined) maintenanceStore.headline = headline;
     if (descriptionText !== undefined) maintenanceStore.descriptionText = descriptionText;
     if (imageUrl !== undefined) maintenanceStore.imageUrl = imageUrl;
+
+    const existing = await prisma.settings.findFirst();
+    if (existing) {
+      await prisma.settings.update({
+        where: { id: existing.id },
+        data: {
+          is_maintenance: Boolean(isMaintenance),
+          ...(headline !== undefined && { maintenance_headline: headline }),
+          ...(descriptionText !== undefined && { maintenance_description: descriptionText }),
+          ...(imageUrl !== undefined && { maintenance_image: imageUrl }),
+        },
+      });
+    } else {
+      await prisma.settings.create({
+        data: {
+          is_maintenance: Boolean(isMaintenance),
+          maintenance_headline: headline || 'System Maintenance Underway',
+          maintenance_description: descriptionText || 'We are upgrading our platform for better stability.',
+          maintenance_image: imageUrl || null,
+        },
+      });
+    }
 
     return res.json({ success: true, message: 'Maintenance mode settings updated successfully!', settings: maintenanceStore });
   } catch (error) {
@@ -1175,6 +1227,14 @@ let cookiePolicyStore = {
 };
 
 export const getCookiePolicySettings = async (req, res) => {
+  try {
+    const s = await prisma.settings.findFirst();
+    if (s) {
+      cookiePolicyStore.isEnabled = Boolean(s.cookie_enabled);
+      if (s.cookie_short_description) cookiePolicyStore.shortDescription = s.cookie_short_description;
+      if (s.cookie_full_description) cookiePolicyStore.fullDescription = s.cookie_full_description;
+    }
+  } catch (e) {}
   return res.json({ success: true, settings: cookiePolicyStore });
 };
 
@@ -1184,6 +1244,26 @@ export const updateCookiePolicySettings = async (req, res) => {
     if (isEnabled !== undefined) cookiePolicyStore.isEnabled = Boolean(isEnabled);
     if (shortDescription !== undefined) cookiePolicyStore.shortDescription = shortDescription;
     if (fullDescription !== undefined) cookiePolicyStore.fullDescription = fullDescription;
+
+    const existing = await prisma.settings.findFirst();
+    if (existing) {
+      await prisma.settings.update({
+        where: { id: existing.id },
+        data: {
+          cookie_enabled: Boolean(isEnabled),
+          ...(shortDescription !== undefined && { cookie_short_description: shortDescription }),
+          ...(fullDescription !== undefined && { cookie_full_description: fullDescription }),
+        },
+      });
+    } else {
+      await prisma.settings.create({
+        data: {
+          cookie_enabled: Boolean(isEnabled),
+          cookie_short_description: shortDescription,
+          cookie_full_description: fullDescription,
+        },
+      });
+    }
 
     return res.json({ success: true, message: 'GDPR Cookie settings updated successfully!', settings: cookiePolicyStore });
   } catch (error) {

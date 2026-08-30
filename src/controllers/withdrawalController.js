@@ -29,11 +29,17 @@ export const createWithdrawal = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Insufficient balance' });
     }
 
-    const settings = (await prisma.settings.findFirst()) || { min_withdrawal: 10, withdrawal_charge: 1 };
+    const settings = (await prisma.settings.findFirst()) || { min_withdrawal: 2, max_withdrawal: 50000, withdrawal_charge: 1 };
     if (withdrawAmount < parseFloat(settings.min_withdrawal)) {
       return res.status(400).json({
         success: false,
         message: `Minimum withdrawal amount is $${settings.min_withdrawal}`,
+      });
+    }
+    if (settings.max_withdrawal && withdrawAmount > parseFloat(settings.max_withdrawal)) {
+      return res.status(400).json({
+        success: false,
+        message: `Maximum withdrawal amount is $${settings.max_withdrawal}`,
       });
     }
 

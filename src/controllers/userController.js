@@ -27,7 +27,7 @@ export const getUserDashboardData = async (req, res) => {
       },
     });
 
-    const [depositAgg, withdrawAgg, refEarningsAgg, referralCount, activeStakes, recentTransactions] = await Promise.all([
+    const [depositAgg, withdrawAgg, refEarningsAgg, referralCount, activeStakes, recentTransactions, siteSettings] = await Promise.all([
       prisma.deposits.aggregate({
         where: { user_id: userId, status: 'APPROVED' },
         _sum: { amount: true },
@@ -52,6 +52,7 @@ export const getUserDashboardData = async (req, res) => {
         take: 10,
         orderBy: { created_at: 'desc' },
       }),
+      prisma.settings.findFirst(),
     ]);
 
     const fullUser = {
@@ -64,6 +65,7 @@ export const getUserDashboardData = async (req, res) => {
     return res.json({
       success: true,
       user: fullUser,
+      settings: siteSettings,
       activeStakes,
       recentTransactions,
       referralCount,
@@ -289,12 +291,34 @@ let customContactLinks = {
 };
 
 export const getContactLinks = async (req, res) => {
+  try {
+    const s = await prisma.settings.findFirst();
+    if (s && s.telegram_support) {
+      customContactLinks.telegramChannel = s.telegram_support;
+    }
+  } catch (e) {}
   return res.json({ success: true, contactLinks: customContactLinks });
 };
 
 export const updateContactLinks = async (req, res) => {
   if (req.body) {
     customContactLinks = { ...customContactLinks, ...req.body };
+    try {
+      const tg = req.body.telegramChannel || req.body.telegram_support;
+      if (tg) {
+        const existing = await prisma.settings.findFirst();
+        if (existing) {
+          await prisma.settings.update({
+            where: { id: existing.id },
+            data: { telegram_support: tg },
+          });
+        } else {
+          await prisma.settings.create({
+            data: { telegram_support: tg },
+          });
+        }
+      }
+    } catch (e) {}
   }
   return res.json({ success: true, message: 'Contact links updated successfully', contactLinks: customContactLinks });
 };
@@ -358,14 +382,57 @@ let customDepositWithdrawalSettings = {
 };
 
 export const getDepositWithdrawalSettings = async (req, res) => {
+  try {
+    const dbSettings = await prisma.settings.findFirst();
+    if (dbSettings) {
+      if (dbSettings.min_deposit !== null) customDepositWithdrawalSettings.minDeposit = String(dbSettings.min_deposit);
+      if (dbSettings.max_deposit !== null) customDepositWithdrawalSettings.maxDeposit = String(dbSettings.max_deposit);
+      if (dbSettings.min_withdrawal !== null) customDepositWithdrawalSettings.minPayout = String(dbSettings.min_withdrawal);
+      if (dbSettings.max_withdrawal !== null) customDepositWithdrawalSettings.maxPayout = String(dbSettings.max_withdrawal);
+      if (dbSettings.withdrawal_charge !== null) customDepositWithdrawalSettings.payoutCharge = String(dbSettings.withdrawal_charge);
+    }
+  } catch (e) {}
   return res.json({ success: true, settings: customDepositWithdrawalSettings });
 };
 
 export const updateDepositWithdrawalSettings = async (req, res) => {
-  if (req.body.settings) {
-    customDepositWithdrawalSettings = { ...customDepositWithdrawalSettings, ...req.body.settings };
+  try {
+    if (req.body.settings) {
+      const s = req.body.settings;
+      customDepositWithdrawalSettings = { ...customDepositWithdrawalSettings, ...s };
+
+      const existing = await prisma.settings.findFirst();
+      if (existing) {
+        await prisma.settings.update({
+          where: { id: existing.id },
+          data: {
+            ...(s.minDeposit ? { min_deposit: parseFloat(s.minDeposit) } : {}),
+            ...(s.maxDeposit ? { max_deposit: parseFloat(s.maxDeposit) } : {}),
+            ...(s.minPayout ? { min_withdrawal: parseFloat(s.minPayout) } : {}),
+            ...(s.maxPayout ? { max_withdrawal: parseFloat(s.maxPayout) } : {}),
+            ...(s.payoutCharge ? { withdrawal_charge: parseFloat(s.payoutCharge) } : {}),
+          },
+        });
+      } else {
+        await prisma.settings.create({
+          data: {
+            min_deposit: s.minDeposit ? parseFloat(s.minDeposit) : 1.0,
+            max_deposit: s.maxDeposit ? parseFloat(s.maxDeposit) : 50000.0,
+            min_withdrawal: s.minPayout ? parseFloat(s.minPayout) : 2.0,
+            max_withdrawal: s.maxPayout ? parseFloat(s.maxPayout) : 1000.0,
+            withdrawal_charge: s.payoutCharge ? parseFloat(s.payoutCharge) : 1.0,
+          },
+        });
+      }
+    }
+    return res.json({
+      success: true,
+      message: 'Deposit & Withdrawal settings updated successfully',
+      settings: customDepositWithdrawalSettings,
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Failed to update settings', error: err.message });
   }
-  return res.json({ success: true, message: 'Deposit & Withdrawal settings updated successfully', settings: customDepositWithdrawalSettings });
 };
 
 export const getUserReferralsData = async (req, res) => {

@@ -31,6 +31,14 @@ export const createDeposit = async (req, res) => {
     }
 
     const depositAmount = parseFloat(amount);
+    const settings = (await prisma.settings.findFirst()) || { min_deposit: 1, max_deposit: 50000 };
+    if (depositAmount < parseFloat(settings.min_deposit)) {
+      return res.status(400).json({ success: false, message: `Minimum deposit amount is $${settings.min_deposit}` });
+    }
+    if (depositAmount > parseFloat(settings.max_deposit)) {
+      return res.status(400).json({ success: false, message: `Maximum deposit amount is $${settings.max_deposit}` });
+    }
+
     const OXAPAY_MERCHANT_KEY = process.env.OXAPAY_MERCHANT_KEY;
     const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5000/api';
 
