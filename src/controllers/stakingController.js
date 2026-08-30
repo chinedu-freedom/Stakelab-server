@@ -4,7 +4,6 @@ import { sendEmail } from '../services/emailService.js';
 export const getStakingPlans = async (req, res) => {
   try {
     const plans = await prisma.staking_plans.findMany({
-      where: { is_active: true },
       orderBy: { sort_order: 'asc' },
     });
     return res.json({ success: true, plans });
