@@ -69,22 +69,24 @@ model users {
 }
 
 model staking_plans {
-  id                  String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  title               String
-  badge               String?      // e.g. "POPULAR", "HIGH YIELD"
-  min_amount          Decimal      @db.Decimal(18, 8)
-  max_amount          Decimal      @db.Decimal(18, 8)
-  apy_percent         Decimal      @db.Decimal(5, 2)
-  daily_return_percent Decimal     @db.Decimal(5, 2)
-  duration_days       Int          // lockup period in days (0 for flexible)
-  tier                String       @default("Flexible Tier") // "Flexible Tier" or "Dynamic Tier"
-  capital_return      Boolean      @default(true)
-  is_active           Boolean      @default(true)
-  sort_order          Int          @default(0)
-  created_at          DateTime     @default(now())
-  updated_at          DateTime     @updatedAt
+  id                   String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title                String
+  badge                String?      // e.g. "POPULAR", "HIGH YIELD"
+  min_amount           Decimal      @db.Decimal(18, 8)
+  max_amount           Decimal      @db.Decimal(18, 8)
+  apy_percent          Decimal      @db.Decimal(5, 2)
+  daily_return_percent Decimal      @db.Decimal(5, 2)
+  duration_days        Int          // lockup period in days (0 for flexible)
+  tier                 String       @default("Flexible Tier") // "Flexible Tier" or "Dynamic Tier"
+  is_fixed_deposit     Boolean      @default(true)
+  capital_return       Boolean      @default(true)
+  is_compounding       Boolean      @default(true)
+  is_active            Boolean      @default(true)
+  sort_order           Int          @default(0)
+  created_at           DateTime     @default(now())
+  updated_at           DateTime     @updatedAt
 
-  user_stakes         user_stakes[]
+  user_stakes          user_stakes[]
 
   @@map("staking_plans")
 }
