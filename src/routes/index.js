@@ -37,6 +37,7 @@ import {
   getAdminWithdrawals,
   approveWithdrawal,
   rejectWithdrawal,
+  getAllStakingPlans,
   createStakingPlan,
   updateStakingPlan,
   deleteStakingPlan,
@@ -156,6 +157,7 @@ router.post('/admin/deposits/:id/reject', authenticateAdmin, rejectDeposit);
 router.get('/admin/withdrawals', authenticateAdmin, getAdminWithdrawals);
 router.post('/admin/withdrawals/:id/approve', authenticateAdmin, approveWithdrawal);
 router.post('/admin/withdrawals/:id/reject', authenticateAdmin, rejectWithdrawal);
+router.get('/admin/staking-plans', authenticateAdmin, getAllStakingPlans);
 router.post('/admin/staking-plans', authenticateAdmin, createStakingPlan);
 router.put('/admin/staking-plans/:id', authenticateAdmin, updateStakingPlan);
 router.delete('/admin/staking-plans/:id', authenticateAdmin, deleteStakingPlan);

@@ -413,21 +413,34 @@ export const rejectWithdrawal = async (req, res) => {
   }
 };
 
+export const getAllStakingPlans = async (req, res) => {
+  try {
+    const plans = await prisma.staking_plans.findMany({
+      orderBy: { sort_order: 'asc' },
+    });
+    return res.json({ success: true, plans });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to fetch admin staking plans', error: error.message });
+  }
+};
+
 export const createStakingPlan = async (req, res) => {
   try {
-    const { title, badge, min_amount, max_amount, apy_percent, daily_return_percent, duration_days, capital_return, tier } = req.body;
+    const { title, badge, min_amount, max_amount, apy_percent, daily_return_percent, duration_days, capital_return, tier, status } = req.body;
+    const isActive = status ? status.toUpperCase() === 'ACTIVE' : true;
 
     const plan = await prisma.staking_plans.create({
       data: {
         title,
-        badge,
+        badge: badge || (isActive ? 'ACTIVE' : 'INACTIVE'),
         min_amount: parseFloat(min_amount),
         max_amount: parseFloat(max_amount),
         apy_percent: parseFloat(apy_percent || 0),
         daily_return_percent: parseFloat(daily_return_percent),
         duration_days: parseInt(duration_days),
         tier: tier || 'Flexible Tier',
-        capital_return: capital_return !== undefined ? capital_return : true,
+        capital_return: capital_return !== undefined ? Boolean(capital_return) : true,
+        is_active: isActive,
       },
     });
 
@@ -440,7 +453,9 @@ export const createStakingPlan = async (req, res) => {
 export const updateStakingPlan = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, badge, min_amount, max_amount, apy_percent, daily_return_percent, duration_days, capital_return, tier, is_active } = req.body;
+    const { title, badge, min_amount, max_amount, apy_percent, daily_return_percent, duration_days, capital_return, tier, is_active, status } = req.body;
+
+    const activeStatus = is_active !== undefined ? Boolean(is_active) : (status ? status.toUpperCase() === 'ACTIVE' : undefined);
 
     const updated = await prisma.staking_plans.update({
       where: { id },
@@ -454,7 +469,7 @@ export const updateStakingPlan = async (req, res) => {
         ...(duration_days !== undefined && { duration_days: parseInt(duration_days) }),
         ...(tier !== undefined && { tier }),
         ...(capital_return !== undefined && { capital_return: Boolean(capital_return) }),
-        ...(is_active !== undefined && { is_active: Boolean(is_active) }),
+        ...(activeStatus !== undefined && { is_active: activeStatus }),
       },
     });
 
