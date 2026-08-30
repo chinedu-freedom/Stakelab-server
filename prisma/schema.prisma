@@ -74,8 +74,8 @@ model staking_plans {
   badge                String?      // e.g. "POPULAR", "HIGH YIELD"
   min_amount           Decimal      @db.Decimal(18, 8)
   max_amount           Decimal      @db.Decimal(18, 8)
-  apy_percent          Decimal      @db.Decimal(5, 2)
-  daily_return_percent Decimal      @db.Decimal(5, 2)
+  apy_percent          Decimal      @db.Decimal(18, 8)
+  daily_return_percent Decimal      @db.Decimal(18, 8)
   duration_days        Int          // lockup period in days (0 for flexible)
   tier                 String       @default("Flexible Tier") // "Flexible Tier" or "Dynamic Tier"
   is_fixed_deposit     Boolean      @default(true)
@@ -255,8 +255,8 @@ model settings {
   max_deposit              Decimal  @default(100000) @db.Decimal(18, 8)
   min_withdrawal           Decimal  @default(10) @db.Decimal(18, 8)
   max_withdrawal           Decimal  @default(10000) @db.Decimal(18, 8)
-  withdrawal_charge        Decimal  @default(1) @db.Decimal(5, 2)
-  referral_commission      Decimal  @default(5) @db.Decimal(5, 2)
+  withdrawal_charge        Decimal  @default(1) @db.Decimal(18, 8)
+  referral_commission      Decimal  @default(5) @db.Decimal(18, 8)
   telegram_support         String?  @default("https://t.me/stakelab_support")
   is_maintenance           Boolean  @default(false)
   maintenance_headline     String?  @default("System Maintenance Underway")

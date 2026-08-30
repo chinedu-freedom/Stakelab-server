@@ -406,21 +406,21 @@ export const updateDepositWithdrawalSettings = async (req, res) => {
         await prisma.settings.update({
           where: { id: existing.id },
           data: {
-            ...(s.minDeposit ? { min_deposit: parseFloat(s.minDeposit) } : {}),
-            ...(s.maxDeposit ? { max_deposit: parseFloat(s.maxDeposit) } : {}),
-            ...(s.minPayout ? { min_withdrawal: parseFloat(s.minPayout) } : {}),
-            ...(s.maxPayout ? { max_withdrawal: parseFloat(s.maxPayout) } : {}),
-            ...(s.payoutCharge ? { withdrawal_charge: parseFloat(s.payoutCharge) } : {}),
+            ...(s.minDeposit !== undefined && { min_deposit: parseFloat(s.minDeposit) || 0 }),
+            ...(s.maxDeposit !== undefined && { max_deposit: parseFloat(s.maxDeposit) || 0 }),
+            ...(s.minPayout !== undefined && { min_withdrawal: parseFloat(s.minPayout) || 0 }),
+            ...(s.maxPayout !== undefined && { max_withdrawal: parseFloat(s.maxPayout) || 0 }),
+            ...(s.payoutCharge !== undefined && { withdrawal_charge: parseFloat(s.payoutCharge) || 0 }),
           },
         });
       } else {
         await prisma.settings.create({
           data: {
-            min_deposit: s.minDeposit ? parseFloat(s.minDeposit) : 1.0,
-            max_deposit: s.maxDeposit ? parseFloat(s.maxDeposit) : 50000.0,
-            min_withdrawal: s.minPayout ? parseFloat(s.minPayout) : 2.0,
-            max_withdrawal: s.maxPayout ? parseFloat(s.maxPayout) : 1000.0,
-            withdrawal_charge: s.payoutCharge ? parseFloat(s.payoutCharge) : 1.0,
+            min_deposit: s.minDeposit !== undefined ? parseFloat(s.minDeposit) : 1.0,
+            max_deposit: s.maxDeposit !== undefined ? parseFloat(s.maxDeposit) : 50000.0,
+            min_withdrawal: s.minPayout !== undefined ? parseFloat(s.minPayout) : 2.0,
+            max_withdrawal: s.maxPayout !== undefined ? parseFloat(s.maxPayout) : 1000.0,
+            withdrawal_charge: s.payoutCharge !== undefined ? parseFloat(s.payoutCharge) : 1.0,
           },
         });
       }
