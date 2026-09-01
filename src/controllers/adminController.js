@@ -1122,11 +1122,27 @@ export const getAppDownloadInfo = async (req, res) => {
   });
 };
 
-export const downloadAppApk = (req, res) => {
-  const dummyApkContent = Buffer.from('PK\x03\x04\x14\x00\x08\x00\x08\x00EverStake Mobile Android Application v2.4.0 (Release Build)');
-  res.setHeader('Content-Type', 'application/vnd.android.package-archive');
-  res.setHeader('Content-Disposition', 'attachment; filename="EverStake-v2.4.0.apk"');
-  return res.send(dummyApkContent);
+export const downloadAppApk = async (req, res) => {
+  try {
+    const fs = await import('fs');
+    const path = await import('path');
+    const apkPath = path.resolve('uploads', 'app-release.apk');
+    if (fs.existsSync(apkPath)) {
+      return res.download(apkPath, 'EverStake-v2.4.0.apk');
+    }
+    if (inMemoryGeneralSettings.appDownloadUrl && inMemoryGeneralSettings.appDownloadUrl !== '/api/app-download') {
+      return res.redirect(inMemoryGeneralSettings.appDownloadUrl);
+    }
+    return res.status(404).json({
+      success: false,
+      message: 'Mobile App APK file has not been uploaded to the server yet by the administrator.',
+    });
+  } catch (err) {
+    return res.status(404).json({
+      success: false,
+      message: 'Mobile App APK file is not available.',
+    });
+  }
 };
 
 export const getLogoFaviconSettings = async (req, res) => {
@@ -1385,56 +1401,4 @@ export const updateSystemFeatures = async (req, res) => {
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to update system features', error: error.message });
   }
-};
-
-export let appDownloadStore = {
-  androidApkUrl: '',
-  iosAppUrl: '',
-  appVersion: '2.4.0',
-};
-
-export const getAppDownloadInfo = async (req, res) => {
-  return res.json({
-    success: true,
-    info: appDownloadStore,
-  });
-};
-
-export const downloadAppApk = async (req, res) => {
-  try {
-    const fs = await import('fs');
-    const path = await import('path');
-    const apkPath = path.resolve('uploads', 'app-release.apk');
-    if (fs.existsSync(apkPath)) {
-      return res.download(apkPath, 'EverStake-v2.4.0.apk');
-    }
-    if (appDownloadStore.androidApkUrl) {
-      return res.redirect(appDownloadStore.androidApkUrl);
-    }
-    return res.status(404).json({
-      success: false,
-      message: 'Mobile App APK file has not been uploaded to the server yet by the administrator.',
-    });
-  } catch (err) {
-    return res.status(404).json({
-      success: false,
-      message: 'Mobile App APK file is not available.',
-    });
-  }
-};
-
-let logoFaviconStore = {
-  logoUrl: '',
-  faviconUrl: '',
-};
-
-export const getLogoFaviconSettings = async (req, res) => {
-  return res.json({ success: true, settings: logoFaviconStore });
-};
-
-export const updateLogoFaviconSettings = async (req, res) => {
-  const { logoUrl, faviconUrl } = req.body;
-  if (logoUrl !== undefined) logoFaviconStore.logoUrl = logoUrl;
-  if (faviconUrl !== undefined) logoFaviconStore.faviconUrl = faviconUrl;
-  return res.json({ success: true, message: 'Logo & Favicon settings updated!', settings: logoFaviconStore });
 };
