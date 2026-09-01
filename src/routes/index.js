@@ -3,7 +3,7 @@ import { register, login, adminLogin, getMe, forgotPassword, verifyOtp, resetPas
 import { getStakingPlans, createStake, getUserStakes, claimStakeProfit } from '../controllers/stakingController.js';
 import { getPaymentMethods, createDeposit, getUserDeposits, oxapayWebhook } from '../controllers/depositController.js';
 import { createWithdrawal, getUserWithdrawals, addOrUpdateUserWallet, getUserWallets } from '../controllers/withdrawalController.js';
-import { createTicket, getUserTickets, getTicketById, replyTicket, getAdminTickets, closeTicket } from '../controllers/ticketController.js';
+import { createTicket, getUserTickets, getTicketById, replyTicket, getAdminTickets, closeTicket, deleteTicketMessage, reopenTicket } from '../controllers/ticketController.js';
 import {
   getUserDashboardData,
   getUserTransactions,
@@ -227,6 +227,7 @@ router.put('/admin/spin-prizes/:id', authenticateAdmin, updateSpinPrize);
 router.delete('/admin/spin-prizes/:id', authenticateAdmin, deleteSpinPrize);
 router.get('/admin/spin-settings', authenticateAdmin, getSpinSettings);
 router.put('/admin/spin-settings', authenticateAdmin, updateSpinSettings);
+router.post('/admin/spin-settings', authenticateAdmin, updateSpinSettings);
 
 router.get('/public/system-features', getSystemFeatures);
 router.post('/admin/settings/system-features', authenticateAdmin, updateSystemFeatures);
@@ -237,10 +238,17 @@ router.post('/user/claim-task', authenticateUser, claimUserTask);
 router.get('/user/spin-info', authenticateUser, getUserSpinInfo);
 router.post('/user/spin', authenticateUser, spinUserWheel);
 
+// Ticket Routes (User)
+router.post('/support/tickets/:id/close', authenticateUser, closeTicket);
+router.post('/support/tickets/:id/reopen', authenticateUser, reopenTicket);
+router.delete('/support/messages/:id', authenticateUser, deleteTicketMessage);
+
 // Ticket Routes (Admin)
 router.get('/admin/tickets', authenticateAdmin, getAdminTickets);
 router.get('/admin/tickets/:id', authenticateAdmin, getTicketById);
 router.post('/admin/tickets/:id/reply', authenticateAdmin, replyTicket);
 router.post('/admin/tickets/:id/close', authenticateAdmin, closeTicket);
+router.post('/admin/tickets/:id/reopen', authenticateAdmin, reopenTicket);
+router.delete('/admin/support/messages/:id', authenticateAdmin, deleteTicketMessage);
 
 export default router;

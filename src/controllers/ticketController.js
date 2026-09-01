@@ -99,9 +99,19 @@ export const getTicketById = async (req, res) => {
 export const replyTicket = async (req, res) => {
   try {
     const { id } = req.params;
-    const { message } = req.body;
+    const { message, reply_to_id, reply_to_name, reply_to_text, attachments } = req.body;
     const isAdmin = !!req.admin;
-    const senderName = isAdmin ? (req.admin?.username || 'Admin Support') : (req.user?.full_name || req.user?.username || 'User');
+
+    let dynamicSiteName = 'EverStake';
+    const siteSettings = await prisma.settings.findFirst();
+    if (siteSettings?.site_name) {
+      dynamicSiteName = siteSettings.site_name;
+    }
+
+    const defaultAdminName = `${dynamicSiteName} Admin`;
+    const senderName = isAdmin 
+      ? (req.admin?.username || defaultAdminName) 
+      : (req.user?.full_name || req.user?.username || 'User');
     const senderType = isAdmin ? 'ADMIN' : 'USER';
 
     if (!message) {
@@ -125,12 +135,20 @@ export const replyTicket = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
     }
 
+    const formattedAttachments = attachments
+      ? (typeof attachments === 'string' ? attachments : JSON.stringify(attachments))
+      : null;
+
     const newMessage = await prisma.ticket_messages.create({
       data: {
         ticket_id: ticket.id,
         sender_type: senderType,
         sender_name: senderName,
         message,
+        attachments: formattedAttachments,
+        ...(reply_to_id && { reply_to_id }),
+        ...(reply_to_name && { reply_to_name }),
+        ...(reply_to_text && { reply_to_text }),
       },
     });
 
@@ -180,13 +198,15 @@ export const getAdminTickets = async (req, res) => {
 export const closeTicket = async (req, res) => {
   try {
     const { id } = req.params;
+    const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id);
 
     const ticket = await prisma.support_tickets.findFirst({
       where: {
         OR: [
-          { id },
+          ...(isUuid ? [{ id }] : []),
           { ticket_id: id.startsWith('#') ? id : `#${id}` },
           { ticket_id: id },
+          { ticket_id: id.replace(/^#/, '') },
         ],
       },
     });
@@ -202,6 +222,52 @@ export const closeTicket = async (req, res) => {
 
     return res.json({ success: true, message: 'Ticket closed successfully' });
   } catch (error) {
+    console.error('Close ticket error:', error);
     return res.status(500).json({ success: false, message: 'Failed to close ticket', error: error.message });
+  }
+};
+
+export const deleteTicketMessage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.ticket_messages.delete({
+      where: { id },
+    });
+    return res.json({ success: true, message: 'Message deleted successfully' });
+  } catch (error) {
+    console.error('Delete message error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to delete message', error: error.message });
+  }
+};
+
+export const reopenTicket = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id);
+
+    const ticket = await prisma.support_tickets.findFirst({
+      where: {
+        OR: [
+          ...(isUuid ? [{ id }] : []),
+          { ticket_id: id.startsWith('#') ? id : `#${id}` },
+          { ticket_id: id },
+          { ticket_id: id.replace(/^#/, '') },
+        ],
+      },
+    });
+
+    if (!ticket) {
+      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+
+    await prisma.support_tickets.update({
+      where: { id: ticket.id },
+      data: { status: 'OPEN' },
+    });
+
+    return res.json({ success: true, message: 'Ticket reopened successfully' });
+  } catch (error) {
+    console.error('Reopen ticket error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to reopen ticket', error: error.message });
   }
 };

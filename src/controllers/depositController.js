@@ -119,8 +119,29 @@ export const createDeposit = async (req, res) => {
 
     sendEmail({
       to: req.user.email,
-      subject: 'Deposit Submitted - Stakelab',
-      html: `<h3>Deposit Received</h3><p>Your deposit of $${depositAmount} via ${payment_method} is currently under review by our admin team.</p>`,
+      subject: 'Deposit Request Received',
+      html: `
+        <h2 style="color: #0f172a; font-size: 20px; font-weight: 800; margin-top: 0; margin-bottom: 16px;">Deposit Request Received</h2>
+        <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-bottom: 16px;">Hi <b>${req.user.username || req.user.full_name}</b>,</p>
+        <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">Your deposit request has been received and is currently pending review & verification.</p>
+        <table width="100%" cellpadding="12" cellspacing="0" style="border-collapse: collapse; margin: 20px 0; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-family: sans-serif;">
+          <tbody>
+            <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+              <td style="font-weight: 700; color: #475569; width: 45%;">Deposit Amount</td>
+              <td style="font-weight: 800; color: #0f172a;">$${depositAmount.toFixed(2)}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td style="font-weight: 700; color: #475569;">Payment Method</td>
+              <td style="color: #0f172a;">${payment_method}</td>
+            </tr>
+            <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+              <td style="font-weight: 700; color: #475569;">Deposit Status</td>
+              <td style="font-weight: 700; color: #d97706;">Pending Review</td>
+            </tr>
+          </tbody>
+        </table>
+        <p style="color: #0f172a; font-weight: 700; margin-top: 20px;">Thank you for choosing EverStake.</p>
+      `,
       emailType: 'DEPOSIT_PROCESSING',
       userId,
     });
@@ -228,8 +249,30 @@ export const oxapayWebhook = async (req, res) => {
         if (userEmail) {
           sendEmail({
             to: userEmail,
-            subject: 'Deposit Approved - Stakelab',
-            html: `<h3>Deposit Confirmed</h3><p>Your deposit of $${creditAmount} via ${deposit.payment_method} has been automatically credited to your balance!</p>`,
+            subject: 'Deposit Successfully Confirmed & Credited',
+            html: `
+              <h2 style="color: #0f172a; font-size: 20px; font-weight: 800; margin-top: 0; margin-bottom: 16px;">Deposit Successfully Confirmed & Credited</h2>
+              <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-bottom: 16px;">Hi <b>${user.username || user.full_name}</b>,</p>
+              <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">Your deposit of <b>$${creditAmount.toFixed(2)}</b> via <b>${deposit.payment_method || 'USDT (BEP20)'}</b> has been automatically credited to your balance.</p>
+              <table width="100%" cellpadding="12" cellspacing="0" style="border-collapse: collapse; margin: 20px 0; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-family: sans-serif;">
+                <tbody>
+                  <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                    <td style="font-weight: 700; color: #475569; width: 45%;">Credited Amount</td>
+                    <td style="font-weight: 800; color: #10b981;">$${creditAmount.toFixed(2)}</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="font-weight: 700; color: #475569;">Payment Method</td>
+                    <td style="color: #0f172a;">${deposit.payment_method || 'USDT (BEP20)'}</td>
+                  </tr>
+                  <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                    <td style="font-weight: 700; color: #475569;">Deposit Status</td>
+                    <td style="font-weight: 700; color: #10b981;">Confirmed & Credited</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-top: 16px;">Kindly log in to your account and stake your funds to start earning.</p>
+              <p style="color: #0f172a; font-weight: 700; margin-top: 16px;">Thank you for choosing EverStake.</p>
+            `,
             emailType: 'DEPOSIT_APPROVED',
             userId: deposit.user_id,
           });

@@ -510,13 +510,59 @@ export const deleteSpinPrize = async (req, res) => {
 };
 
 export const getSpinSettings = async (req, res) => {
-  return res.json({ success: true, settings: spinSettingsStore });
+  try {
+    const [spinWinAgg, totalSpinsCount, freeSpinsCount] = await Promise.all([
+      prisma.transactions.aggregate({
+        where: { type: 'SPIN_WIN' },
+        _sum: { amount: true },
+      }),
+      prisma.transactions.count({
+        where: { type: { in: ['SPIN_WIN', 'SPIN_FEE'] } },
+      }),
+      prisma.transactions.count({
+        where: { type: 'SPIN_WIN', description: { contains: 'free', mode: 'insensitive' } },
+      }),
+    ]);
+
+    const totalSpins = totalSpinsCount || spinSettingsStore.total_spins_used || 0;
+    const totalRewards = parseFloat(spinWinAgg._sum.amount || spinSettingsStore.total_rewards_earned || 0);
+    const freeSpinsRedeemed = freeSpinsCount || spinSettingsStore.free_spins_used || 0;
+
+    return res.json({
+      success: true,
+      settings: {
+        ...spinSettingsStore,
+        feature_enabled: systemFeaturesStore.spinWheel,
+        total_spins_used: totalSpins,
+        total_rewards_earned: totalRewards,
+        free_spins_used: freeSpinsRedeemed,
+      },
+    });
+  } catch (err) {
+    return res.json({
+      success: true,
+      settings: {
+        ...spinSettingsStore,
+        feature_enabled: systemFeaturesStore.spinWheel,
+      },
+    });
+  }
 };
 
 export const updateSpinSettings = async (req, res) => {
   try {
     spinSettingsStore = { ...spinSettingsStore, ...req.body };
-    return res.json({ success: true, message: 'Spin wheel settings updated successfully!', settings: spinSettingsStore });
+    if (req.body.feature_enabled !== undefined) {
+      systemFeaturesStore.spinWheel = Boolean(req.body.feature_enabled);
+    }
+    return res.json({
+      success: true,
+      message: 'Spin wheel settings updated successfully!',
+      settings: {
+        ...spinSettingsStore,
+        feature_enabled: systemFeaturesStore.spinWheel,
+      },
+    });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Failed to update spin settings', error: err.message });
   }
@@ -547,7 +593,23 @@ let userRecentSpinWins = [
     created_at: new Date(Date.now() - 7200000).toISOString(),
   },
 ];
-let userFreeSpinsCount = 2;
+export async function grantDepositFreeSpins(userId) {
+  try {
+    const count = parseInt(spinSettingsStore.free_spins_per_deposit || 1);
+    if (count > 0 && userId) {
+      const user = await prisma.users.findUnique({ where: { id: userId } });
+      if (user) {
+        const newSpins = (user.free_spins || 0) + count;
+        await prisma.users.update({
+          where: { id: userId },
+          data: { free_spins: newSpins },
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Error granting deposit free spins:', err);
+  }
+}
 
 export const getSystemFeatures = async (req, res) => {
   return res.json({ success: true, features: systemFeaturesStore });
@@ -666,10 +728,15 @@ export const claimUserTask = async (req, res) => {
 
 export const getUserSpinInfo = async (req, res) => {
   const userId = req.user?.id;
+  let userFreeSpins = 0;
   let recentWins = [];
 
   if (userId) {
     try {
+      const dbUser = await prisma.users.findUnique({ where: { id: userId } });
+      if (dbUser) {
+        userFreeSpins = dbUser.free_spins || 0;
+      }
       const wins = await prisma.transactions.findMany({
         where: { user_id: userId, type: 'SPIN_WIN' },
         take: 10,
@@ -689,8 +756,8 @@ export const getUserSpinInfo = async (req, res) => {
 
   return res.json({
     success: true,
-    freeSpins: userFreeSpinsCount,
-    costPerSpin: spinSettingsStore.cost_per_spin || 5,
+    freeSpins: userFreeSpins,
+    costPerSpin: parseFloat(spinSettingsStore.cost_per_spin || 5),
     prizes: spinPrizesStore,
     recentWins,
   });
@@ -698,19 +765,35 @@ export const getUserSpinInfo = async (req, res) => {
 
 export const spinUserWheel = async (req, res) => {
   try {
-    const userId = req.user?.id;
-    const costPerSpin = parseFloat(spinSettingsStore.cost_per_spin || 5);
-    let isFree = false;
-
-    if (userFreeSpinsCount > 0) {
-      userFreeSpinsCount -= 1;
-      isFree = true;
+    if (systemFeaturesStore.spinWheel === false) {
+      return res.status(403).json({ success: false, message: 'Lucky Spin Wheel is currently disabled by the administration.' });
     }
 
-    if (userId && !isFree) {
-      const dbUser = await prisma.users.findUnique({ where: { id: userId } });
-      if (!dbUser || parseFloat(dbUser.balance || 0) < costPerSpin) {
-        return res.status(400).json({ success: false, message: `Insufficient balance to spin wheel. Each spin costs $${costPerSpin.toFixed(2)}.` });
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'User unauthorized' });
+    }
+
+    const dbUser = await prisma.users.findUnique({ where: { id: userId } });
+    if (!dbUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const currentFreeSpins = dbUser.free_spins || 0;
+    const costPerSpin = parseFloat(spinSettingsStore.cost_per_spin || 5);
+    let isFree = false;
+    let newFreeSpins = currentFreeSpins;
+
+    if (currentFreeSpins > 0) {
+      newFreeSpins = currentFreeSpins - 1;
+      isFree = true;
+    } else {
+      const currentBalance = parseFloat(dbUser.balance || 0);
+      if (currentBalance < costPerSpin) {
+        return res.status(400).json({
+          success: false,
+          message: `Insufficient balance to spin wheel. Each spin costs $${costPerSpin.toFixed(2)}.`,
+        });
       }
     }
 
@@ -719,14 +802,60 @@ export const spinUserWheel = async (req, res) => {
     const isWin = winningPrize.amount > 0;
     const winAmount = parseFloat(winningPrize.amount || 0);
 
-    const newWin = {
-      id: `win-${Date.now()}`,
-      prize: { name: winningPrize.label },
-      reward_earned: winAmount,
-      spin_type: isFree ? 'free' : 'paid',
-      created_at: new Date().toISOString(),
-    };
-    userRecentSpinWins.unshift(newWin);
+    const oldBal = parseFloat(dbUser.balance || 0);
+    const oldEarned = parseFloat(dbUser.total_earned || 0);
+    let newBal = oldBal;
+    let newEarned = oldEarned;
+
+    if (!isFree) newBal -= costPerSpin;
+    if (isWin) {
+      newBal += winAmount;
+      newEarned += winAmount;
+    }
+
+    const txns = [];
+    if (!isFree) {
+      txns.push(
+        prisma.transactions.create({
+          data: {
+            user_id: userId,
+            type: 'SPIN_FEE',
+            amount: costPerSpin,
+            balance_before: oldBal,
+            balance_after: newBal,
+            description: 'Paid Lucky Spin Wheel Entry',
+            created_at: new Date(),
+          },
+        })
+      );
+    }
+    if (isWin) {
+      txns.push(
+        prisma.transactions.create({
+          data: {
+            user_id: userId,
+            type: 'SPIN_WIN',
+            amount: winAmount,
+            balance_before: oldEarned,
+            balance_after: newEarned,
+            description: `Won ${winningPrize.label} on Lucky Spin Wheel ${isFree ? '(Free Spin)' : ''}`,
+            created_at: new Date(),
+          },
+        })
+      );
+    }
+
+    await prisma.$transaction([
+      prisma.users.update({
+        where: { id: userId },
+        data: {
+          balance: newBal,
+          total_earned: newEarned,
+          free_spins: newFreeSpins,
+        },
+      }),
+      ...txns,
+    ]);
 
     spinSettingsStore.total_spins_used += 1;
     if (isFree) {
@@ -734,65 +863,6 @@ export const spinUserWheel = async (req, res) => {
     }
     if (isWin) {
       spinSettingsStore.total_rewards_earned += winAmount;
-    }
-
-    if (userId) {
-      const dbUser = await prisma.users.findUnique({ where: { id: userId } });
-      if (dbUser) {
-        const oldBal = parseFloat(dbUser.balance || 0);
-        const oldEarned = parseFloat(dbUser.total_earned || 0);
-        let newBal = oldBal;
-        let newEarned = oldEarned;
-
-        if (!isFree) newBal -= costPerSpin;
-        if (isWin) {
-          newBal += winAmount;
-          newEarned += winAmount;
-        }
-
-        const txns = [];
-        if (!isFree) {
-          txns.push(
-            prisma.transactions.create({
-              data: {
-                user_id: userId,
-                type: 'SPIN_FEE',
-                amount: costPerSpin,
-                balance_before: oldBal,
-                balance_after: newBal,
-                description: 'Paid Lucky Spin Wheel Entry',
-                created_at: new Date(),
-              },
-            })
-          );
-        }
-        if (isWin) {
-          txns.push(
-            prisma.transactions.create({
-              data: {
-                user_id: userId,
-                type: 'SPIN_WIN',
-                amount: winAmount,
-                balance_before: oldEarned,
-                balance_after: newEarned,
-                description: `Won ${winningPrize.label} on Lucky Spin Wheel`,
-                created_at: new Date(),
-              },
-            })
-          );
-        }
-
-        await prisma.$transaction([
-          prisma.users.update({
-            where: { id: userId },
-            data: {
-              balance: newBal,
-              total_earned: newEarned,
-            },
-          }),
-          ...txns,
-        ]);
-      }
     }
 
     return res.json({
@@ -804,7 +874,7 @@ export const spinUserWheel = async (req, res) => {
       message: isWin
         ? `Congratulations! You won ${winningPrize.label}!`
         : 'Better luck next time!',
-      freeSpinsRemaining: userFreeSpinsCount,
+      freeSpinsRemaining: newFreeSpins,
     });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Failed to spin wheel', error: err.message });

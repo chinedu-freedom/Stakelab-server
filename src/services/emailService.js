@@ -32,48 +32,48 @@ function renderEmailTemplate({ siteName, siteLogo, subject, content, emailType }
   const cleanSubject = stripEmojisAndIcons(subject || 'Notification').replace(/everstake|stakelab/gi, siteName);
   const isNotification = emailType === 'ADMIN_NOTIFICATION' || emailType === 'NOTIFICATION';
 
-  // Detect 6-digit verification code if present
+  // Detect verification code if present
   const codeMatch = typeof content === 'string' ? content.match(/\b\d{4,8}\b/) : null;
   const extractedCode = codeMatch ? codeMatch[0] : null;
 
-  // Header Brand styling - refined, mature, corporate
+  // Header Brand styling - Sleek EverStake Dark Navy Header
   const headerBrandHtml = siteLogo
-    ? `<img src="${siteLogo}" alt="${siteName}" style="max-height: 44px; max-width: 200px; object-fit: contain; display: block; margin: 0 auto;" />`
-    : `<div style="text-align: center;"><span style="font-family: 'Segoe UI', Arial, sans-serif; font-size: 24px; font-weight: 800; color: #ffffff; letter-spacing: 2px; text-transform: uppercase;">${siteName}</span></div>`;
+    ? `<img src="${siteLogo}" alt="${siteName}" style="max-height: 40px; max-width: 200px; object-fit: contain; display: block; margin: 0 auto;" />`
+    : `<div style="text-align: center;"><span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 24px; font-weight: 900; color: #ffffff; letter-spacing: 1.5px; text-transform: uppercase;">EVER<span style="color: #ff0044;">STAKE</span></span></div>`;
 
   let innerContentHtml = content;
 
   if (typeof content === 'string' && !content.includes('<!DOCTYPE')) {
-    const cleanContent = stripEmojisAndIcons(content);
+    let cleanContent = stripEmojisAndIcons(content);
 
     if (isNotification) {
       innerContentHtml = `
-        <div style="background-color: #0c1a36; border: 1px solid #1a2d54; border-radius: 14px; padding: 28px; margin-bottom: 10px;">
-          <div style="font-size: 11px; font-weight: 700; color: #fe780b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 14px;">Official Announcement</div>
-          <h2 style="color: #ffffff; font-size: 20px; font-weight: 700; margin-top: 0; margin-bottom: 16px;">${cleanSubject}</h2>
-          <div style="color: #cbd5e1; font-size: 14px; line-height: 1.7;">
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin-bottom: 10px;">
+          <div style="font-size: 11px; font-weight: 800; color: #ff0044; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">Official Announcement</div>
+          <h2 style="color: #0f172a; font-size: 18px; font-weight: 800; margin-top: 0; margin-bottom: 14px;">${cleanSubject}</h2>
+          <div style="color: #334155; font-size: 14px; line-height: 1.7;">
             ${cleanContent}
           </div>
         </div>
       `;
-    } else if (extractedCode && (emailType === 'PIN_RESET_OTP' || emailType === 'EMAIL_VERIFICATION' || cleanSubject.toLowerCase().includes('pin') || cleanSubject.toLowerCase().includes('code') || cleanSubject.toLowerCase().includes('otp'))) {
+    } else if (extractedCode && (emailType === 'PIN_RESET_OTP' || emailType === 'EMAIL_VERIFICATION' || cleanSubject.toLowerCase().includes('pin') || cleanSubject.toLowerCase().includes('code') || cleanSubject.toLowerCase().includes('otp') || cleanSubject.toLowerCase().includes('verify'))) {
       innerContentHtml = `
-        <div style="text-align: center; margin-bottom: 24px;">
-          <h2 style="color: #ffffff; font-size: 20px; font-weight: 700; margin: 0 0 8px 0;">${cleanSubject}</h2>
-          <p style="color: #94a3b8; font-size: 13px; margin: 0;">Please use the 6-digit verification code below to authorize your request.</p>
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="color: #0f172a; font-size: 20px; font-weight: 800; margin: 0 0 8px 0;">${cleanSubject}</h2>
+          <p style="color: #64748b; font-size: 13px; margin: 0;">Please use the verification code below to authorize your request.</p>
         </div>
 
-        <div style="background-color: #0c1a36; border: 1px solid #1a2e56; border-radius: 14px; padding: 28px 16px; text-align: center; margin: 20px 0;">
-          <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 1.5px; margin-bottom: 10px;">Verification Code</div>
-          <div style="font-family: 'Courier New', Courier, monospace; font-size: 38px; font-weight: 800; color: #ffffff; letter-spacing: 10px; margin: 8px 0;">
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px 16px; text-align: center; margin: 20px 0;">
+          <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #64748b; letter-spacing: 1.5px; margin-bottom: 12px;">Verification Code</div>
+          <div style="display: inline-block; background-color: #0d9488; color: #ffffff; font-family: 'Courier New', Courier, monospace; font-size: 32px; font-weight: 800; letter-spacing: 8px; padding: 12px 28px; border-radius: 8px;">
             ${extractedCode}
           </div>
-          <div style="font-size: 11px; color: #64748b; margin-top: 10px;">Valid for 10 minutes. Do not share this code.</div>
+          <div style="font-size: 12px; color: #64748b; margin-top: 14px;">This code is valid for <b>10 minutes</b>. For your security, do not share this code with anyone.</div>
         </div>
       `;
     } else {
       innerContentHtml = `
-        <div style="color: #cbd5e1; font-size: 14px; line-height: 1.7;">
+        <div style="color: #334155; font-size: 14px; line-height: 1.7;">
           ${cleanContent}
         </div>
       `;
@@ -87,31 +87,31 @@ function renderEmailTemplate({ siteName, siteLogo, subject, content, emailType }
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${cleanSubject}</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #050d1a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #cbd5e1; -webkit-font-smoothing: antialiased;">
-  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #050d1a; width: 100%; min-height: 100vh; padding: 36px 12px;">
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #334155; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; width: 100%; min-height: 100vh; padding: 36px 12px;">
     <tr>
       <td align="center" valign="top">
-        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 540px; background-color: #08142b; border: 1px solid #16284c; border-top: 4px solid #fe780b; border-radius: 16px; overflow: hidden; box-shadow: 0 15px 35px rgba(0,0,0,0.45);">
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 560px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.06);">
           <!-- Header Bar -->
           <tr>
-            <td align="center" style="background-color: #08142b; padding: 28px 24px; border-bottom: 1px solid #12213f;">
+            <td align="center" style="background-color: #0c1424; padding: 24px 20px; border-bottom: 3px solid #ff0044;">
               ${headerBrandHtml}
             </td>
           </tr>
           <!-- Body Content Area -->
           <tr>
-            <td style="padding: 32px 28px; background-color: #08142b;">
+            <td style="padding: 36px 32px; background-color: #ffffff;">
               ${innerContentHtml}
             </td>
           </tr>
           <!-- Footer Area -->
           <tr>
-            <td align="center" style="background-color: #050d1e; padding: 22px 20px; border-top: 1px solid #12213f; font-size: 12px; color: #64748b; line-height: 1.6;">
-              <p style="margin: 0 0 4px 0; font-weight: 600; color: #94a3b8;">
-                &copy; ${new Date().getFullYear()} <span style="color: #fe780b;">${siteName}</span>. All rights reserved.
+            <td align="center" style="background-color: #f8fafc; padding: 24px 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; line-height: 1.6;">
+              <p style="margin: 0 0 6px 0; font-weight: 600; color: #475569;">
+                &copy; ${new Date().getFullYear()} <span style="color: #ff0044; font-weight: 700;">${siteName}</span>. All rights reserved.
               </p>
-              <p style="margin: 0; font-size: 11px; color: #475569;">
-                This is an automated operational notification sent from ${siteName}. Please do not reply directly to this email.
+              <p style="margin: 0; font-size: 11px; color: #94a3b8;">
+                Your trusted investment partner. This is an automated email notification from ${siteName}. Please do not reply directly.
               </p>
             </td>
           </tr>

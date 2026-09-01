@@ -1,5 +1,6 @@
 import { prisma } from '../config/db.js';
 import { sendEmail } from '../services/emailService.js';
+import { grantDepositFreeSpins } from './rewardController.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 
@@ -269,15 +270,46 @@ export const approveDeposit = async (req, res) => {
           balance_before: deposit.user.balance,
           balance_after: newBalance,
           reference_id: deposit.id,
-          description: `Deposit approved: $${deposit.amount} via ${deposit.payment_method}`,
+          description: `Deposit successful`,
         },
       }),
     ]);
 
+    // Process deposit referral commissions & free spin rewards
+    await grantDepositFreeSpins(deposit.user_id);
+    await processReferralCommissions({
+      userId: deposit.user_id,
+      amount: parseFloat(deposit.amount),
+      sourceUser: deposit.user,
+      eventType: 'DEPOSIT',
+    });
+
     sendEmail({
       to: deposit.user.email,
-      subject: 'Deposit Approved',
-      html: `<h2>Deposit Approved</h2><p>Your deposit of $${deposit.amount} has been approved and credited to your account balance.</p>`,
+      subject: 'Deposit Successfully Confirmed & Credited',
+      html: `
+        <h2 style="color: #0f172a; font-size: 20px; font-weight: 800; margin-top: 0; margin-bottom: 16px;">Deposit Successfully Confirmed & Credited</h2>
+        <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-bottom: 16px;">Hi <b>${deposit.user.username || deposit.user.full_name}</b>,</p>
+        <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">Your deposit of <b>$${parseFloat(deposit.amount).toFixed(2)}</b> via <b>${deposit.payment_method || 'USDT (BEP20)'}</b> has been automatically credited to your balance.</p>
+        <table width="100%" cellpadding="12" cellspacing="0" style="border-collapse: collapse; margin: 20px 0; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-family: sans-serif;">
+          <tbody>
+            <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+              <td style="font-weight: 700; color: #475569; width: 45%;">Credited Amount</td>
+              <td style="font-weight: 800; color: #10b981;">$${parseFloat(deposit.amount).toFixed(2)}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td style="font-weight: 700; color: #475569;">Payment Method</td>
+              <td style="color: #0f172a;">${deposit.payment_method || 'USDT (BEP20)'}</td>
+            </tr>
+            <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+              <td style="font-weight: 700; color: #475569;">Deposit Status</td>
+              <td style="font-weight: 700; color: #10b981;">Confirmed & Credited</td>
+            </tr>
+          </tbody>
+        </table>
+        <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-top: 16px;">Kindly log in to your account and stake your funds to start earning.</p>
+        <p style="color: #0f172a; font-weight: 700; margin-top: 16px;">Thank you for choosing EverStake.</p>
+      `,
       emailType: 'DEPOSIT_APPROVED',
       userId: deposit.user_id,
     });
@@ -312,8 +344,30 @@ export const rejectDeposit = async (req, res) => {
 
     sendEmail({
       to: deposit.user.email,
-      subject: 'Deposit Rejected - Stakelab',
-      html: `<h2>Deposit Rejected</h2><p>Your deposit of $${deposit.amount} was rejected. Reason: ${reason || 'Proof verification failed'}</p>`,
+      subject: 'Deposit Request Rejected',
+      html: `
+        <h2 style="color: #0f172a; font-size: 20px; font-weight: 800; margin-top: 0; margin-bottom: 16px;">Deposit Request Rejected</h2>
+        <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-bottom: 16px;">Hi <b>${deposit.user.username || deposit.user.full_name}</b>,</p>
+        <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">Your deposit request could not be processed at this time.</p>
+        <table width="100%" cellpadding="12" cellspacing="0" style="border-collapse: collapse; margin: 20px 0; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-family: sans-serif;">
+          <tbody>
+            <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+              <td style="font-weight: 700; color: #475569; width: 45%;">Amount</td>
+              <td style="font-weight: 800; color: #0f172a;">$${parseFloat(deposit.amount).toFixed(2)}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td style="font-weight: 700; color: #475569;">Status</td>
+              <td style="font-weight: 700; color: #ef4444;">Rejected</td>
+            </tr>
+            <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+              <td style="font-weight: 700; color: #475569;">Reason</td>
+              <td style="color: #64748b;">${reason || 'Deposit proof verification failed'}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p style="color: #64748b; font-size: 13px; margin-top: 20px; line-height: 1.6;">If you have any questions, please contact our support team.</p>
+        <p style="color: #0f172a; font-weight: 700; margin-top: 16px;">Thank you for choosing EverStake.</p>
+      `,
       emailType: 'DEPOSIT_REJECTED',
       userId: deposit.user_id,
     });
@@ -327,7 +381,7 @@ export const rejectDeposit = async (req, res) => {
 export const getAdminWithdrawals = async (req, res) => {
   try {
     const withdrawals = await prisma.withdrawals.findMany({
-      include: { user: { select: { id: true, full_name: true, email: true } } },
+      include: { user: { select: { id: true, full_name: true, email: true, username: true } } },
       orderBy: { created_at: 'desc' },
     });
     return res.json({ success: true, withdrawals });
@@ -359,10 +413,37 @@ export const approveWithdrawal = async (req, res) => {
       },
     });
 
+    const amountFormatted = parseFloat(withdrawal.net_amount || withdrawal.amount).toFixed(2);
+
     sendEmail({
       to: withdrawal.user.email,
-      subject: 'Withdrawal Approved',
-      html: `<h2>Withdrawal Sent!</h2><p>Your withdrawal request for $${withdrawal.net_amount} has been processed to your address: ${withdrawal.wallet_address}</p>`,
+      subject: 'Withdrawal Successfully Processed',
+      html: `
+        <h2 style="color: #0f172a; font-size: 20px; font-weight: 800; margin-top: 0; margin-bottom: 16px;">Withdrawal Successfully Processed</h2>
+        <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-bottom: 16px;">Hi <b>${withdrawal.user.username || withdrawal.user.full_name}</b>,</p>
+        <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">Your withdrawal request has been successfully processed.</p>
+        <table width="100%" cellpadding="12" cellspacing="0" style="border-collapse: collapse; margin: 20px 0; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-family: sans-serif;">
+          <tbody>
+            <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+              <td style="font-weight: 700; color: #475569; width: 45%;">Amount</td>
+              <td style="font-weight: 800; color: #10b981;">$${amountFormatted}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td style="font-weight: 700; color: #475569;">Status</td>
+              <td style="font-weight: 700; color: #10b981;">Completed</td>
+            </tr>
+            <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+              <td style="font-weight: 700; color: #475569;">Withdrawal Method</td>
+              <td style="color: #0f172a;">${withdrawal.withdrawal_method || 'Crypto'}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td style="font-weight: 700; color: #475569;">Destination Address</td>
+              <td style="font-family: monospace; font-size: 12px; color: #334155; word-break: break-all;">"${withdrawal.wallet_address}"</td>
+            </tr>
+          </tbody>
+        </table>
+        <p style="color: #0f172a; font-weight: 700; margin-top: 20px;">Thank you for choosing EverStake.</p>
+      `,
       emailType: 'WITHDRAWAL_APPROVED',
       userId: withdrawal.user_id,
     });
@@ -415,8 +496,30 @@ export const rejectWithdrawal = async (req, res) => {
 
     sendEmail({
       to: withdrawal.user.email,
-      subject: 'Withdrawal Rejected',
-      html: `<h2>Withdrawal Rejected</h2><p>Your withdrawal of $${withdrawal.amount} was rejected and refunded to your balance. Reason: ${reason || 'Security check'}</p>`,
+      subject: 'Withdrawal Request Rejected',
+      html: `
+        <h2 style="color: #0f172a; font-size: 20px; font-weight: 800; margin-top: 0; margin-bottom: 16px;">Withdrawal Request Rejected</h2>
+        <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-bottom: 16px;">Hi <b>${withdrawal.user.username || withdrawal.user.full_name}</b>,</p>
+        <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">Your withdrawal request could not be completed and the amount has been refunded to your account balance.</p>
+        <table width="100%" cellpadding="12" cellspacing="0" style="border-collapse: collapse; margin: 20px 0; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-family: sans-serif;">
+          <tbody>
+            <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+              <td style="font-weight: 700; color: #475569; width: 45%;">Refunded Amount</td>
+              <td style="font-weight: 800; color: #0f172a;">$${parseFloat(withdrawal.amount).toFixed(2)}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td style="font-weight: 700; color: #475569;">Status</td>
+              <td style="font-weight: 700; color: #ef4444;">Rejected & Refunded</td>
+            </tr>
+            <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+              <td style="font-weight: 700; color: #475569;">Reason</td>
+              <td style="color: #64748b;">${reason || 'Security check'}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p style="color: #64748b; font-size: 13px; margin-top: 20px; line-height: 1.6;">If you have any questions, please contact our support team.</p>
+        <p style="color: #0f172a; font-weight: 700; margin-top: 16px;">Thank you for choosing EverStake.</p>
+      `,
       emailType: 'WITHDRAWAL_REJECTED',
       userId: withdrawal.user_id,
     });
@@ -606,7 +709,7 @@ export const updateUserBalance = async (req, res) => {
           amount: numAmount,
           balance_before: currentVal,
           balance_after: newVal,
-          description: `Admin ${action === 'add' ? 'added' : 'subtracted'} $${numAmount.toFixed(2)} ${action === 'add' ? 'to' : 'from'} ${targetWallet}. Remark: ${remark}`,
+          description: action === 'add' ? 'Deposit credited' : 'Deposit debited',
         },
       }),
     ]);
@@ -844,7 +947,7 @@ export const getAdminStakingHistory = async (req, res) => {
   }
 };
 
-let referralConfigStore = {
+export let referralConfigStore = {
   depositEnabled: true,
   depositLevels: [
     { level: 1, percent: 10 },
@@ -859,15 +962,86 @@ let referralConfigStore = {
   ],
 };
 
-export const getReferralSettings = async (req, res) => {
+export async function processReferralCommissions({ userId, amount, sourceUser, eventType }) {
   try {
-    const s = await prisma.settings.findFirst();
-    if (s && s.referral_commission !== null) {
-      const topComm = parseFloat(s.referral_commission);
-      if (referralConfigStore.depositLevels[0]) referralConfigStore.depositLevels[0].percent = topComm;
-      if (referralConfigStore.stakingLevels[0]) referralConfigStore.stakingLevels[0].percent = topComm;
+    const isStaking = eventType === 'STAKING';
+    const isEnabled = isStaking ? referralConfigStore.stakingEnabled : referralConfigStore.depositEnabled;
+    if (!isEnabled) return;
+
+    const levels = isStaking ? referralConfigStore.stakingLevels : referralConfigStore.depositLevels;
+    if (!Array.isArray(levels) || levels.length === 0) return;
+
+    let currentInviterId = sourceUser?.referred_by;
+    if (!currentInviterId) return;
+
+    for (let i = 0; i < levels.length && currentInviterId; i++) {
+      const levelObj = levels[i];
+      const levelPercent = parseFloat(levelObj.percent || 0);
+      const inviter = await prisma.users.findUnique({ where: { id: currentInviterId } });
+      if (!inviter) break;
+
+      if (levelPercent > 0) {
+        const commissionAmount = (amount * levelPercent) / 100;
+        if (commissionAmount > 0) {
+          const inviterNewBalance = parseFloat(inviter.balance) + commissionAmount;
+          const inviterNewEarned = parseFloat(inviter.total_earned || 0) + commissionAmount;
+
+          await prisma.$transaction([
+            prisma.users.update({
+              where: { id: inviter.id },
+              data: {
+                balance: inviterNewBalance,
+                total_earned: inviterNewEarned,
+              },
+            }),
+            prisma.transactions.create({
+              data: {
+                user_id: inviter.id,
+                type: 'REFERRAL_COMMISSION',
+                amount: commissionAmount,
+                balance_before: inviter.balance,
+                balance_after: inviterNewBalance,
+                description: `Level ${levelObj.level || i + 1} ${isStaking ? 'Staking' : 'Deposit'} Referral Commission (${levelPercent}%) from @${sourceUser.username || sourceUser.full_name}'s $${amount} ${isStaking ? 'staking' : 'deposit'}`,
+              },
+            }),
+          ]);
+        }
+      }
+
+      // Direct inviter free spin reward on first stake
+      if (i === 0 && isStaking) {
+        try {
+          await prisma.transactions.create({
+            data: {
+              user_id: inviter.id,
+              type: 'FREE_SPIN_REWARD',
+              amount: 1,
+              balance_before: inviter.balance,
+              balance_after: inviter.balance,
+              description: `Earned +1 Lucky Free Spin because @${sourceUser.username || sourceUser.full_name} deposited & invested $${amount}`,
+            },
+          });
+
+          sendEmail({
+            to: inviter.email,
+            subject: '🎁 You Earned 1 Lucky Free Spin! - EverStake',
+            html: `<h2>Congratulations ${inviter.full_name}!</h2><p>Your invited referral <b>@${sourceUser.username || sourceUser.full_name}</b> has completed a deposit and invested $${amount}.</p><p>You have earned <b>+1 Lucky Free Spin</b> to win crypto prizes on EverStake!</p>`,
+            emailType: 'FREE_SPIN_REWARD',
+            userId: inviter.id,
+          });
+        } catch (err) {
+          console.error('Failed to reward free spin to referrer:', err);
+        }
+      }
+
+      currentInviterId = inviter.referred_by;
     }
-  } catch (e) {}
+  } catch (err) {
+    console.error('Error processing referral commissions:', err);
+  }
+}
+
+export const getReferralSettings = async (req, res) => {
   return res.json({ success: true, referralSettings: referralConfigStore });
 };
 
@@ -889,7 +1063,7 @@ export const updateReferralSettings = async (req, res) => {
       }));
     }
 
-    const topComm = referralConfigStore.depositLevels[0]?.percent || referralConfigStore.stakingLevels[0]?.percent || 5;
+    const topComm = referralConfigStore.depositLevels[0]?.percent || 10;
     const existing = await prisma.settings.findFirst();
     if (existing) {
       await prisma.settings.update({

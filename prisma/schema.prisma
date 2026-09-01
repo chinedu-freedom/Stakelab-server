@@ -48,6 +48,7 @@ model users {
   email_verify_code    String?
   email_verify_expires DateTime?
   is_active            Boolean   @default(true)
+  free_spins           Int       @default(0)
   last_login           DateTime?
   last_ip              String?
   created_at           DateTime  @default(now())
@@ -316,13 +317,16 @@ model support_tickets {
 }
 
 model ticket_messages {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ticket_id   String   @db.Uuid
-  sender_type String   // USER, ADMIN
-  sender_name String
-  message     String
-  attachments String?  // JSON stringified array of attachment URLs
-  created_at  DateTime @default(now())
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticket_id     String   @db.Uuid
+  sender_type   String   // USER, ADMIN
+  sender_name   String
+  message       String
+  attachments   String?  // JSON stringified array of attachment URLs
+  reply_to_id   String?
+  reply_to_name String?
+  reply_to_text String?
+  created_at    DateTime @default(now())
 
   ticket support_tickets @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
 

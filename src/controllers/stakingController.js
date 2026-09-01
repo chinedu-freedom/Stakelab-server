@@ -1,5 +1,6 @@
 import { prisma } from '../config/db.js';
 import { sendEmail } from '../services/emailService.js';
+import { processReferralCommissions } from './adminController.js';
 
 export const getStakingPlans = async (req, res) => {
   try {
@@ -32,8 +33,19 @@ export const createStake = async (req, res) => {
     const stakeAmount = parseFloat(amount);
 
     const plan = await prisma.staking_plans.findUnique({ where: { id: plan_id } });
-    if (!plan || !plan.is_active) {
-      return res.status(404).json({ success: false, message: 'Staking plan not found or inactive' });
+    if (!plan) {
+      return res.status(404).json({ success: false, message: 'Staking plan not found.' });
+    }
+
+    const rawSt = (plan.status || plan.badge || '').toUpperCase();
+    const isComingSoon = rawSt === 'COMING_SOON' || rawSt === 'COMING SOON';
+    if (isComingSoon) {
+      return res.status(400).json({ success: false, message: 'This staking plan is coming soon and is not available for purchase yet.' });
+    }
+
+    const isPlanUnavailable = !plan.is_active || rawSt === 'UNAVAILABLE' || rawSt === 'INACTIVE';
+    if (isPlanUnavailable) {
+      return res.status(400).json({ success: false, message: 'This staking plan is currently unavailable for purchase.' });
     }
 
     if (stakeAmount < parseFloat(plan.min_amount) || stakeAmount > parseFloat(plan.max_amount)) {
@@ -96,73 +108,14 @@ export const createStake = async (req, res) => {
       }),
     ]);
 
-    // Referral Commission & Free Spin Reward Logic
+    // Referral Commission & Free Spin Reward Logic (Dynamic Admin Configured)
     if (user.referred_by) {
-      try {
-        const commissionPercents = [10.0, 5.0, 3.0, 2.0, 1.0];
-        let currentInviterId = user.referred_by;
-
-        for (let level = 0; level < commissionPercents.length && currentInviterId; level++) {
-          const inviter = await prisma.users.findUnique({ where: { id: currentInviterId } });
-          if (!inviter) break;
-
-          const commissionAmount = (stakeAmount * commissionPercents[level]) / 100;
-          if (commissionAmount > 0) {
-            const inviterNewBalance = parseFloat(inviter.balance) + commissionAmount;
-            const inviterNewEarned = parseFloat(inviter.total_earned) + commissionAmount;
-
-            await prisma.$transaction([
-              prisma.users.update({
-                where: { id: inviter.id },
-                data: {
-                  balance: inviterNewBalance,
-                  total_earned: inviterNewEarned,
-                },
-              }),
-              prisma.transactions.create({
-                data: {
-                  user_id: inviter.id,
-                  type: 'REFERRAL_COMMISSION',
-                  amount: commissionAmount,
-                  balance_before: inviter.balance,
-                  balance_after: inviterNewBalance,
-                  description: `Level ${level + 1} Referral Commission from @${user.username || user.full_name}'s $${stakeAmount} investment`,
-                },
-              }),
-            ]);
-          }
-
-          // Level 1 Direct Inviter receives +1 Free Spin reward when referred user deposits and invests
-          if (level === 0) {
-            try {
-              await prisma.transactions.create({
-                data: {
-                  user_id: inviter.id,
-                  type: 'FREE_SPIN_REWARD',
-                  amount: 1,
-                  balance_before: inviter.balance,
-                  balance_after: inviter.balance,
-                  description: `Earned +1 Lucky Free Spin because @${user.username || user.full_name} deposited & invested $${stakeAmount}`,
-                },
-              });
-
-              sendEmail({
-                to: inviter.email,
-                subject: '🎁 You Earned 1 Lucky Free Spin! - StakeLab',
-                html: `<h2>Congratulations ${inviter.full_name}!</h2><p>Your invited referral <b>@${user.username || user.full_name}</b> has completed a deposit and invested $${stakeAmount}.</p><p>You have earned <b>+1 Lucky Free Spin</b> to win crypto prizes on StakeLab!</p>`,
-                emailType: 'FREE_SPIN_REWARD',
-                userId: inviter.id,
-              });
-            } catch (spinErr) {
-              console.error('Free spin reward logging error:', spinErr);
-            }
-          }
-
-          currentInviterId = inviter.referred_by;
-        }
-      } catch (err) {
-        console.error('Referral commission processing error:', err);
-      }
+      await processReferralCommissions({
+        userId: user.id,
+        amount: stakeAmount,
+        sourceUser: user,
+        eventType: 'STAKING',
+      });
     }
 
     // Staking Bonus Logic
