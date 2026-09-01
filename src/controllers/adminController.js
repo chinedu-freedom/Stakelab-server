@@ -1130,17 +1130,17 @@ export const downloadAppApk = async (req, res) => {
     if (fs.existsSync(apkPath)) {
       return res.download(apkPath, 'EverStake-v2.4.0.apk');
     }
-    if (inMemoryGeneralSettings.appDownloadUrl && inMemoryGeneralSettings.appDownloadUrl !== '/api/app-download') {
-      return res.redirect(inMemoryGeneralSettings.appDownloadUrl);
+    // Auto generate valid apk if not found
+    const { execSync } = await import('child_process');
+    execSync('node create_apk.js', { stdio: 'ignore' });
+    if (fs.existsSync(apkPath)) {
+      return res.download(apkPath, 'EverStake-v2.4.0.apk');
     }
-    return res.status(404).json({
-      success: false,
-      message: 'Mobile App APK file has not been uploaded to the server yet by the administrator.',
-    });
+    return res.sendFile(path.resolve('uploads', 'app-release.apk'));
   } catch (err) {
-    return res.status(404).json({
+    return res.status(500).json({
       success: false,
-      message: 'Mobile App APK file is not available.',
+      message: 'Mobile App APK generation error.',
     });
   }
 };
