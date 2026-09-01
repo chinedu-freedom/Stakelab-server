@@ -66,6 +66,8 @@ import {
   getCookiePolicySettings,
   updateCookiePolicySettings,
   adminChangeVerificationPassword,
+  getSystemFeatures,
+  updateSystemFeatures,
 } from '../controllers/adminController.js';
 import {
   getGiftCodes,
@@ -89,8 +91,6 @@ import {
   deleteSpinPrize,
   getSpinSettings,
   updateSpinSettings,
-  getSystemFeatures,
-  updateSystemFeatures,
   getUserTasks,
   claimUserTask,
   getUserSpinInfo,
@@ -117,8 +117,11 @@ router.get('/public/partners', getPartners);
 router.get('/public/contact-links', getContactLinks);
 router.get('/public/why-choose-us', getWhyChooseUs);
 router.get('/public/logo-favicon', getLogoFaviconSettings);
+router.get('/public/general-setting', getGeneralSettings);
 router.get('/public/deposit-withdrawal-settings', getDepositWithdrawalSettings);
 router.post('/admin/deposit-withdrawal-settings', authenticateAdmin, updateDepositWithdrawalSettings);
+router.post('/oxapay-webhook', oxapayWebhook);
+router.get('/oxapay-webhook', oxapayWebhook);
 
 // User Protected Routes
 router.get('/auth/me', authenticateUser, getMe);
@@ -195,6 +198,9 @@ router.get('/public/cookie-policy', getCookiePolicySettings);
 router.get('/admin/cookie-policy', authenticateAdmin, getCookiePolicySettings);
 router.post('/admin/cookie-policy', authenticateAdmin, updateCookiePolicySettings);
 router.post('/admin/verification-password', authenticateAdmin, adminChangeVerificationPassword);
+router.get('/public/system-features', getSystemFeatures);
+router.get('/admin/settings/system-features', authenticateAdmin, getSystemFeatures);
+router.post('/admin/settings/system-features', authenticateAdmin, updateSystemFeatures);
 
 // Reward & Gamification Routes
 router.get('/admin/gift-codes', authenticateAdmin, getGiftCodes);

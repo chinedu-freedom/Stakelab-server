@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../config/db.js';
 import { sendEmail } from '../services/emailService.js';
+import { inMemoryGeneralSettings } from './adminController.js';
 
 const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY || '6LffwZUtAAAAALsM0OkIFctHSBITmbn7AZLg3caC';
 
@@ -92,6 +93,8 @@ export const register = async (req, res) => {
 
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
 
+    const bonus = parseFloat(inMemoryGeneralSettings?.registrationBonus || 0);
+
     const user = await prisma.users.create({
       data: {
         email,
@@ -111,8 +114,24 @@ export const register = async (req, res) => {
         withdrawal_pin: withdrawal_pin || null,
         referral_code: newRefCode,
         referred_by: referrerId,
+        ...(bonus > 0 && { balance: bonus }),
       },
     });
+
+    if (bonus > 0) {
+      const trId = 'REG' + Math.random().toString(36).substring(2, 10).toUpperCase();
+      await prisma.transactions.create({
+        data: {
+          user_id: user.id,
+          type: 'GIFT_BONUS',
+          amount: bonus,
+          balance_before: 0,
+          balance_after: bonus,
+          reference_id: trId,
+          description: `Welcome Sign Up Bonus of ${bonus.toFixed(2)} USDT credited to account.`,
+        },
+      }).catch(() => null);
+    }
 
     // Send verification email
     sendEmail({

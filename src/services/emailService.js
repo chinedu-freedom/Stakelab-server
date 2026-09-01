@@ -29,7 +29,7 @@ function stripEmojisAndIcons(str) {
 
 // Helper: Render Dynamic Master HTML Email Template
 function renderEmailTemplate({ siteName, siteLogo, subject, content, emailType }) {
-  const cleanSubject = stripEmojisAndIcons(subject || 'Notification').replace(/stakelab/gi, siteName);
+  const cleanSubject = stripEmojisAndIcons(subject || 'Notification').replace(/everstake|stakelab/gi, siteName);
   const isNotification = emailType === 'ADMIN_NOTIFICATION' || emailType === 'NOTIFICATION';
 
   // Detect 6-digit verification code if present
@@ -39,7 +39,7 @@ function renderEmailTemplate({ siteName, siteLogo, subject, content, emailType }
   // Header Brand styling - refined, mature, corporate
   const headerBrandHtml = siteLogo
     ? `<img src="${siteLogo}" alt="${siteName}" style="max-height: 44px; max-width: 200px; object-fit: contain; display: block; margin: 0 auto;" />`
-    : `<div style="text-align: center;"><span style="font-family: 'Segoe UI', Arial, sans-serif; font-size: 24px; font-weight: 800; color: #ffffff; letter-spacing: 2px; text-transform: uppercase;">EVER<span style="color: #fe780b;">STAKE</span></span></div>`;
+    : `<div style="text-align: center;"><span style="font-family: 'Segoe UI', Arial, sans-serif; font-size: 24px; font-weight: 800; color: #ffffff; letter-spacing: 2px; text-transform: uppercase;">${siteName}</span></div>`;
 
   let innerContentHtml = content;
 

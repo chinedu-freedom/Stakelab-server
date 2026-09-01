@@ -12,13 +12,6 @@ export const getAdminStats = async (req, res) => {
     const activeUsers = await prisma.users.count({ where: { is_active: true } });
     const todayUsers = await prisma.users.count({ where: { created_at: { gte: todayStart } } });
     const emailUnverified = await prisma.users.count({ where: { email_verified: false } });
-    const mobileUnverified = await prisma.users.count({
-      where: {
-        OR: [{ mobile: null }, { mobile: '' }],
-      },
-    });
-    const kycUnverified = await prisma.users.count({ where: { profile_complete: false } });
-    const kycPending = await prisma.users.count({ where: { profile_complete: false } });
 
     const totalDepositsAgg = await prisma.deposits.aggregate({
       where: { status: 'APPROVED' },
@@ -145,16 +138,39 @@ export const getAdminStats = async (req, res) => {
       .slice(0, 10);
 
     const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const revenueTrendData = [6, 5, 4, 3, 2, 1, 0].map((d) => {
+    const revenueTrendData = await Promise.all([6, 5, 4, 3, 2, 1, 0].map(async (d) => {
       const date = new Date();
       date.setDate(date.getDate() - d);
-      const dayName = daysOfWeek[date.getDay()];
+      const dayStart = new Date(date);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(date);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      const dayDepositsAgg = await prisma.deposits.aggregate({
+        where: { status: 'APPROVED', created_at: { gte: dayStart, lte: dayEnd } },
+        _sum: { amount: true },
+      });
+      const dayStakingAgg = await prisma.user_stakes.aggregate({
+        where: { created_at: { gte: dayStart, lte: dayEnd } },
+        _sum: { amount: true },
+      });
+
       return {
-        name: dayName,
-        Deposits: 0,
-        Staking: 0,
+        name: daysOfWeek[date.getDay()],
+        Deposits: parseFloat(dayDepositsAgg._sum.amount || 0),
+        Staking: parseFloat(dayStakingAgg._sum.amount || 0),
       };
-    });
+    }));
+
+    const formattedRecentTransactions = recentTx.map((t) => ({
+      id: t.id,
+      userName: t.user?.full_name || t.user?.username || 'User',
+      type: t.type,
+      amount: parseFloat(t.amount || 0),
+      balanceAfter: parseFloat(t.balance_after || 0),
+      description: t.description,
+      createdAt: t.created_at,
+    }));
 
     return res.json({
       success: true,
@@ -163,9 +179,6 @@ export const getAdminStats = async (req, res) => {
         activeUsers,
         todayUsers,
         emailUnverified,
-        mobileUnverified,
-        kycUnverified,
-        kycPending,
         totalDeposited: totalDepositsAgg._sum.amount || 0,
         todaysDeposit: todaysDepositAgg._sum.amount || 0,
         pendingDeposits: pendingDepositsCount,
@@ -196,6 +209,7 @@ export const getAdminStats = async (req, res) => {
           usdBalance: parseFloat(u.balance || 0),
         })),
         recentActivities: combinedActivities,
+        recentTransactions: formattedRecentTransactions,
         revenueTrendData,
         browserStats: [],
         osStats: [],
@@ -609,7 +623,7 @@ export const updateUserBalance = async (req, res) => {
 
 export const sendBatchNotification = async (req, res) => {
   try {
-    const { subject, message, channel, target_users } = req.body;
+    const { subject, message, target_users } = req.body;
     if (!subject || !message) {
       return res.status(400).json({ success: false, message: 'Subject and message are required' });
     }
@@ -618,7 +632,6 @@ export const sendBatchNotification = async (req, res) => {
     if (target_users === 'Active Users') where.is_active = true;
     if (target_users === 'Banned Users') where.is_active = false;
     if (target_users === 'Email Unverified') where.email_verified = false;
-    if (target_users === 'KYC Unverified') where.profile_complete = false;
 
     const targetList = await prisma.users.findMany({ where, select: { email: true, full_name: true } });
 
@@ -632,7 +645,7 @@ export const sendBatchNotification = async (req, res) => {
 
     return res.json({
       success: true,
-      message: `Batch notification queued successfully for ${targetList.length} users via ${(channel || 'email').toUpperCase()}!`,
+      message: `Batch notification queued successfully for ${targetList.length} users via EMAIL!`,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to send batch notification', error: error.message });
@@ -647,12 +660,6 @@ export const getAdminUsers = async (req, res) => {
     if (status === 'banned') where.is_active = false;
     if (status === 'active') where.is_active = true;
     if (filter === 'email_unverified' || filter === 'email-unverified') where.email_verified = false;
-    if (filter === 'mobile_unverified' || filter === 'mobile-unverified') {
-      where.OR = [{ mobile: null }, { mobile: '' }];
-    }
-    if (filter === 'kyc_unverified' || filter === 'kyc-unverified' || filter === 'kyc_pending' || filter === 'kyc-pending') {
-      where.profile_complete = false;
-    }
 
     const users = await prisma.users.findMany({
       where,
@@ -677,8 +684,6 @@ export const getAdminUsers = async (req, res) => {
     const mappedUsers = users.map((u) => ({
       ...u,
       name: u.full_name || u.username || 'User',
-      mobile_verified: !!(u.mobile && u.mobile.trim() !== ''),
-      kyc_status: u.profile_complete ? 'verified' : 'unverified',
     }));
 
     return res.json({ success: true, users: mappedUsers });
@@ -801,8 +806,6 @@ export const updateAdminUserDetail = async (req, res) => {
     if (state !== undefined) data.state = state;
     if (zip_code !== undefined) data.zip_code = zip_code;
     if (email_verified !== undefined) data.email_verified = Boolean(email_verified);
-    if (mobile_verified !== undefined) data.mobile_verified = Boolean(mobile_verified);
-    if (two_factor_enabled !== undefined) data.two_factor_enabled = Boolean(two_factor_enabled);
     if (is_active !== undefined) data.is_active = Boolean(is_active);
     if (withdrawal_pin !== undefined) data.withdrawal_pin = withdrawal_pin;
 
@@ -914,7 +917,7 @@ export const adminChangePassword = async (req, res) => {
     const { currentPassword, newPassword } = req.body;
     const adminId = req.admin.id;
 
-    const admin = await prisma.admin.findUnique({ where: { id: adminId } });
+    const admin = await prisma.admins.findUnique({ where: { id: adminId } });
     if (!admin) {
       return res.status(404).json({ success: false, message: 'Admin account not found' });
     }
@@ -925,7 +928,7 @@ export const adminChangePassword = async (req, res) => {
     }
 
     const newHash = await bcrypt.hash(newPassword, 10);
-    await prisma.admin.update({
+    await prisma.admins.update({
       where: { id: adminId },
       data: { password_hash: newHash },
     });
@@ -1025,8 +1028,9 @@ let logoFaviconStore = {
   faviconUrl: null,
 };
 
-let inMemoryGeneralSettings = {
+export let inMemoryGeneralSettings = {
   appDownloadUrl: '/api/app-download',
+  registrationBonus: 0.0,
 };
 
 export const getGeneralSettings = async (req, res) => {
@@ -1048,7 +1052,7 @@ export const getGeneralSettings = async (req, res) => {
         currency: settingRecord.currency_name,
         currencySymbol: settingRecord.currency_symbol,
         timezone: 'UTC',
-        registrationBonus: 0.0,
+        registrationBonus: inMemoryGeneralSettings.registrationBonus || 0.0,
         logoUrl: settingRecord.site_logo,
         appDownloadUrl: inMemoryGeneralSettings.appDownloadUrl || '/api/app-download',
       },
@@ -1060,10 +1064,13 @@ export const getGeneralSettings = async (req, res) => {
 
 export const updateGeneralSettings = async (req, res) => {
   try {
-    const { siteTitle, currency, currencySymbol, logoUrl, appDownloadUrl } = req.body;
+    const { siteTitle, currency, currencySymbol, logoUrl, appDownloadUrl, registrationBonus } = req.body;
 
     if (appDownloadUrl) {
       inMemoryGeneralSettings.appDownloadUrl = appDownloadUrl;
+    }
+    if (registrationBonus !== undefined) {
+      inMemoryGeneralSettings.registrationBonus = parseFloat(registrationBonus || 0);
     }
 
     let settingRecord = await prisma.settings.findFirst();
@@ -1095,7 +1102,7 @@ export const updateGeneralSettings = async (req, res) => {
         currency: settingRecord.currency_name,
         currencySymbol: settingRecord.currency_symbol,
         timezone: 'UTC',
-        registrationBonus: 0.0,
+        registrationBonus: inMemoryGeneralSettings.registrationBonus || 0.0,
         logoUrl: settingRecord.site_logo,
         appDownloadUrl: inMemoryGeneralSettings.appDownloadUrl || '/api/app-download',
       },
@@ -1137,6 +1144,8 @@ export const getLogoFaviconSettings = async (req, res) => {
     return res.json({
       success: true,
       settings: {
+        siteTitle: settingRecord.site_title || settingRecord.site_name || 'EverStake',
+        siteName: settingRecord.site_name || settingRecord.site_title || 'EverStake',
         logoUrl: settingRecord.site_logo,
         faviconUrl: settingRecord.site_favicon,
       },
@@ -1342,4 +1351,90 @@ export const getAdminNotifications = async (req, res) => {
     console.error('Error fetching admin notifications:', err);
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
+};
+
+export let systemFeaturesStore = {
+  giftBonus: true,
+  tasks: true,
+  dailyCheckin: true,
+  spinWheel: true,
+};
+
+export const getSystemFeatures = async (req, res) => {
+  return res.json({
+    success: true,
+    features: systemFeaturesStore,
+  });
+};
+
+export const updateSystemFeatures = async (req, res) => {
+  try {
+    const { giftBonus, tasks, dailyCheckin, spinWheel, invitationTasks, luckySpin } = req.body;
+    if (giftBonus !== undefined) systemFeaturesStore.giftBonus = Boolean(giftBonus);
+    if (tasks !== undefined) systemFeaturesStore.tasks = Boolean(tasks);
+    if (invitationTasks !== undefined) systemFeaturesStore.tasks = Boolean(invitationTasks);
+    if (dailyCheckin !== undefined) systemFeaturesStore.dailyCheckin = Boolean(dailyCheckin);
+    if (spinWheel !== undefined) systemFeaturesStore.spinWheel = Boolean(spinWheel);
+    if (luckySpin !== undefined) systemFeaturesStore.spinWheel = Boolean(luckySpin);
+
+    return res.json({
+      success: true,
+      message: 'System features updated successfully!',
+      features: systemFeaturesStore,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to update system features', error: error.message });
+  }
+};
+
+export let appDownloadStore = {
+  androidApkUrl: '',
+  iosAppUrl: '',
+  appVersion: '2.4.0',
+};
+
+export const getAppDownloadInfo = async (req, res) => {
+  return res.json({
+    success: true,
+    info: appDownloadStore,
+  });
+};
+
+export const downloadAppApk = async (req, res) => {
+  try {
+    const fs = await import('fs');
+    const path = await import('path');
+    const apkPath = path.resolve('uploads', 'app-release.apk');
+    if (fs.existsSync(apkPath)) {
+      return res.download(apkPath, 'EverStake-v2.4.0.apk');
+    }
+    if (appDownloadStore.androidApkUrl) {
+      return res.redirect(appDownloadStore.androidApkUrl);
+    }
+    return res.status(404).json({
+      success: false,
+      message: 'Mobile App APK file has not been uploaded to the server yet by the administrator.',
+    });
+  } catch (err) {
+    return res.status(404).json({
+      success: false,
+      message: 'Mobile App APK file is not available.',
+    });
+  }
+};
+
+let logoFaviconStore = {
+  logoUrl: '',
+  faviconUrl: '',
+};
+
+export const getLogoFaviconSettings = async (req, res) => {
+  return res.json({ success: true, settings: logoFaviconStore });
+};
+
+export const updateLogoFaviconSettings = async (req, res) => {
+  const { logoUrl, faviconUrl } = req.body;
+  if (logoUrl !== undefined) logoFaviconStore.logoUrl = logoUrl;
+  if (faviconUrl !== undefined) logoFaviconStore.faviconUrl = faviconUrl;
+  return res.json({ success: true, message: 'Logo & Favicon settings updated!', settings: logoFaviconStore });
 };
