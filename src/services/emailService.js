@@ -36,10 +36,10 @@ function renderEmailTemplate({ siteName, siteLogo, subject, content, emailType }
   const codeMatch = typeof content === 'string' ? content.match(/\b\d{4,8}\b/) : null;
   const extractedCode = codeMatch ? codeMatch[0] : null;
 
-  // Header Brand styling - Sleek EverStake Dark Navy Header
+  // Header Brand styling - Sleek EverStake Dark Navy Header Bar
   const headerBrandHtml = siteLogo
     ? `<img src="${siteLogo}" alt="${siteName}" style="max-height: 40px; max-width: 200px; object-fit: contain; display: block; margin: 0 auto;" />`
-    : `<div style="text-align: center;"><span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 24px; font-weight: 900; color: #ffffff; letter-spacing: 1.5px; text-transform: uppercase;">EVER<span style="color: #ff0044;">STAKE</span></span></div>`;
+    : `<div style="text-align: center;"><span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 24px; font-weight: 900; color: #ffffff; letter-spacing: 1.5px; text-transform: uppercase;">EVER<span style="color: #ff0044;">STAKE</span></span></div>`;
 
   let innerContentHtml = content;
 
@@ -48,10 +48,10 @@ function renderEmailTemplate({ siteName, siteLogo, subject, content, emailType }
 
     if (isNotification) {
       innerContentHtml = `
-        <div style="background-color: #07132a; border: 1px solid #1a2c54; border-radius: 14px; padding: 26px; margin-bottom: 10px;">
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin-bottom: 10px;">
           <div style="font-size: 11px; font-weight: 800; color: #ff0044; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px;">Official Announcement</div>
-          <h2 style="color: #ffffff !important; font-size: 18px; font-weight: 800; margin-top: 0; margin-bottom: 14px;">${cleanSubject}</h2>
-          <div style="color: #cbd5e1 !important; font-size: 14px; line-height: 1.7;">
+          <h2 style="color: #0f172a; font-size: 18px; font-weight: 800; margin-top: 0; margin-bottom: 14px;">${cleanSubject}</h2>
+          <div style="color: #334155; font-size: 14px; line-height: 1.7;">
             ${cleanContent}
           </div>
         </div>
@@ -59,31 +59,24 @@ function renderEmailTemplate({ siteName, siteLogo, subject, content, emailType }
     } else if (extractedCode || emailType === 'PIN_RESET_OTP' || emailType === 'EMAIL_VERIFICATION' || emailType === 'VERIFICATION' || emailType === 'PASSWORD_RESET') {
       const displayCode = extractedCode || '******';
       innerContentHtml = `
-        <div style="text-align: center; margin-bottom: 24px;">
-          <h2 style="color: #0f172a; font-size: 20px; font-weight: 800; margin: 0 0 8px 0;">${cleanSubject}</h2>
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="color: #0f172a; font-size: 22px; font-weight: 800; margin: 0 0 8px 0; letter-spacing: -0.5px;">${cleanSubject}</h2>
           <p style="color: #475569; font-size: 14px; margin: 0; line-height: 1.5;">Please use the security verification code below to authorize your request.</p>
         </div>
 
-        <!-- Dark-mode proof OTP Box using Linear Gradient Background -->
-        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 20px 0; border-collapse: collapse;">
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 24px 0; border-collapse: collapse;">
           <tr>
-            <td align="center" style="background-color: #0c1424 !important; background-image: linear-gradient(#0c1424, #0c1424) !important; border: 1px solid #1e2d4a; border-radius: 16px; padding: 28px 20px; text-align: center;">
+            <td align="center" style="background-color: #fff1f2; border: 2px dashed #ff0044; border-radius: 16px; padding: 28px 20px; text-align: center;">
               
-              <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important; letter-spacing: 2px; margin-bottom: 16px;">
-                Security Verification Code
+              <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #e11d48; letter-spacing: 2px; margin-bottom: 14px;">
+                SECURITY VERIFICATION CODE
               </div>
 
-              <table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center" style="margin: 0 auto; border-collapse: collapse;">
-                <tr>
-                  <td align="center" style="background-color: #ff0044 !important; background-image: linear-gradient(#ff0044, #ff0044) !important; border-radius: 10px; padding: 14px 32px; text-align: center;">
-                    <span style="font-family: 'Courier New', Courier, monospace; font-size: 34px; font-weight: 900; letter-spacing: 8px; color: #ffffff !important; -webkit-text-fill-color: #ffffff !important; text-decoration: none; display: inline-block;">
-                      ${displayCode}
-                    </span>
-                  </td>
-                </tr>
-              </table>
+              <div style="font-family: 'Courier New', Courier, monospace; font-size: 38px; font-weight: 900; letter-spacing: 10px; color: #ff0044; background-color: #ffffff; padding: 14px 28px; border-radius: 10px; border: 1px solid #fecdd3; display: inline-block; margin: 0 auto;">
+                ${displayCode}
+              </div>
 
-              <div style="font-size: 12.5px; color: #cbd5e1 !important; -webkit-text-fill-color: #cbd5e1 !important; margin-top: 18px; line-height: 1.5;">
+              <div style="font-size: 12px; color: #64748b; margin-top: 16px; line-height: 1.5;">
                 This code is valid for <b>10 minutes</b>. For your account security, do not share this code with anyone.
               </div>
 
@@ -93,7 +86,7 @@ function renderEmailTemplate({ siteName, siteLogo, subject, content, emailType }
       `;
     } else {
       innerContentHtml = `
-        <div style="color: #334155 !important; font-size: 14px; line-height: 1.7;">
+        <div style="color: #334155; font-size: 14px; line-height: 1.7;">
           ${cleanContent}
         </div>
       `;
@@ -105,15 +98,13 @@ function renderEmailTemplate({ siteName, siteLogo, subject, content, emailType }
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="color-scheme" content="light dark">
-  <meta name="supported-color-schemes" content="light dark">
   <title>${cleanSubject}</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #334155; -webkit-font-smoothing: antialiased;">
-  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; width: 100%; min-height: 100vh; padding: 36px 12px;">
+<body style="margin: 0; padding: 0; background-color: #f4f6f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #334155; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f4f6f9; width: 100%; min-height: 100vh; padding: 36px 12px;">
     <tr>
       <td align="center" valign="top">
-        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 560px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.06);">
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 560px; background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.05);">
           <!-- Header Bar -->
           <tr>
             <td align="center" style="background-color: #0c1424; padding: 24px 20px; border-bottom: 3px solid #ff0044;">
@@ -128,12 +119,12 @@ function renderEmailTemplate({ siteName, siteLogo, subject, content, emailType }
           </tr>
           <!-- Footer Area -->
           <tr>
-            <td align="center" style="background-color: #f8fafc; padding: 24px 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; line-height: 1.6;">
-              <p style="margin: 0 0 6px 0; font-weight: 600; color: #475569;">
+            <td align="center" style="background-color: #f9fafb; padding: 24px 20px; border-top: 1px solid #f3f4f6; font-size: 12px; color: #6b7280; line-height: 1.6;">
+              <p style="margin: 0 0 6px 0; font-weight: 600; color: #374151;">
                 &copy; ${new Date().getFullYear()} <span style="color: #ff0044; font-weight: 700;">${siteName}</span>. All rights reserved.
               </p>
-              <p style="margin: 0; font-size: 11px; color: #94a3b8;">
-                Your trusted investment partner. This is an automated email notification from ${siteName}. Please do not reply directly.
+              <p style="margin: 0; font-size: 11px; color: #9ca3af;">
+                Your trusted investment partner. This is an automated notification from ${siteName}. Please do not reply directly.
               </p>
             </td>
           </tr>
