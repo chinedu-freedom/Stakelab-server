@@ -91,8 +91,15 @@ export function renderEmailTemplate({ siteName, siteLogo, subject, content, emai
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${cleanSubject}</title>
 </head>
 <body style="margin:0; padding:0; background-color:#ffffff; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+  <!-- Hidden Preheader Text to Prevent Mobile Gmail Thread Clipping -->
+  <div style="display:none; font-size:1px; color:#ffffff; line-height:1px; max-height:0px; max-width:0px; opacity:0; overflow:hidden; mso-hide:all;">
+    ${cleanSubject} ${extractedCode ? `- Verification Code: ${extractedCode}` : ''}
+    &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
+  </div>
+  <!-- <!-- ID: ${Date.now()} --> -->
   <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#ffffff; width: 100%; border-collapse: collapse;">
      <tr>
       <td align="center">
