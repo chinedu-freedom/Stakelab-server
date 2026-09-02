@@ -27,10 +27,9 @@ function stripEmojisAndIcons(str) {
     .trim();
 }
 
-// Helper: Render Master Email Template matching reference design
+// Helper: Render Master Email Template matching eonassetsmining-backend
 export function renderEmailTemplate({ siteName, siteLogo, subject, content, emailType }) {
   const cleanSubject = stripEmojisAndIcons(subject || 'Notification').replace(/everstake|stakelab/gi, siteName);
-  const isNotification = emailType === 'ADMIN_NOTIFICATION' || emailType === 'NOTIFICATION';
 
   if (typeof content === 'string' && content.includes('<!DOCTYPE')) {
     return content;
@@ -39,11 +38,6 @@ export function renderEmailTemplate({ siteName, siteLogo, subject, content, emai
   // Detect verification code if present (4 to 8 digits)
   const codeMatch = typeof content === 'string' ? content.match(/\b\d{4,8}\b/) : null;
   const extractedCode = codeMatch ? codeMatch[0] : null;
-
-  // Header Brand styling matching reference
-  const headerBrandHtml = siteLogo
-    ? `<img src="${siteLogo}" alt="${siteName}" style="max-height: 44px; max-width: 200px; object-fit: contain; display: block; margin: 0 auto;" />`
-    : `<div style="text-align: center;"><span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 26px; font-weight: 900; color: #ffffff; letter-spacing: 1px; text-transform: uppercase;">EVER<span style="color: #ff0044;">STAKE</span></span></div>`;
 
   let innerContentHtml = content;
 
@@ -94,37 +88,31 @@ export function renderEmailTemplate({ siteName, siteLogo, subject, content, emai
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${cleanSubject}</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #060e20; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #e2e8f0; -webkit-font-smoothing: antialiased;">
-  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #060e20; width: 100%; min-height: 100vh; padding: 32px 12px;">
-    <tr>
-      <td align="center" valign="top">
-        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 520px; background-color: #101828; border: 1px solid #1e293b; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-          <!-- Header Bar -->
+<body style="margin:0; padding:0; background-color:#f8f9fa; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#f8f9fa; padding:40px 0;">
+     <tr>
+      <td align="center">
+        <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,0.04);">
+          <!-- Header -->
           <tr>
-            <td align="center" style="background-color: #0b1329; padding: 32px 24px; text-align: center; border-bottom: 1px solid #1e293b;">
-              ${headerBrandHtml}
-              <div style="font-size: 13px; color: #94a3b8; font-weight: 500; margin-top: 6px; letter-spacing: 0.5px;">
-                Simple. Secure. Smart Investing.
-              </div>
+            <td style="background-color:#ff0044; padding:30px 40px; text-align:center;">
+              <h1 style="color:#ffffff; margin:0; font-size:28px; letter-spacing:1px; font-weight: 900; text-transform: uppercase;">${siteName}</h1>
             </td>
           </tr>
-          <!-- Body Content Area -->
+          <!-- Body -->
           <tr>
-            <td style="padding: 36px 28px; background-color: #101828; color: #e2e8f0;">
+            <td style="padding:40px;">
               ${innerContentHtml}
             </td>
           </tr>
-          <!-- Footer Area -->
+          <!-- Footer -->
           <tr>
-            <td align="center" style="background-color: #0b1329; padding: 24px 20px; border-top: 1px solid #1e293b; text-align: center;">
-              <div style="font-size: 12.5px; color: #94a3b8; line-height: 1.6;">
-                &copy; ${new Date().getFullYear()} <b style="color: #ffffff;">${siteName}</b>. All rights reserved.
-              </div>
-              <div style="font-size: 12px; color: #64748b; margin-top: 4px;">
-                Your trusted investment partner.
-              </div>
+            <td style="background-color:#f1f5f9; padding:24px 40px; text-align:center;">
+              <p style="margin:0; color:#64748b; font-size:13px; line-height:1.6;">
+                &copy; ${new Date().getFullYear()} ${siteName}. All rights reserved.<br>
+                You received this email because you are registered on ${siteName}.
+              </p>
             </td>
           </tr>
         </table>
