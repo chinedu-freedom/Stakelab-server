@@ -27,19 +27,112 @@ function stripEmojisAndIcons(str) {
     .trim();
 }
 
-// Helper: Render Clean Minimal Email
+// Helper: Render Master Email Template matching reference design
 export function renderEmailTemplate({ siteName, siteLogo, subject, content, emailType }) {
   const cleanSubject = stripEmojisAndIcons(subject || 'Notification').replace(/everstake|stakelab/gi, siteName);
+  const isNotification = emailType === 'ADMIN_NOTIFICATION' || emailType === 'NOTIFICATION';
 
   if (typeof content === 'string' && content.includes('<!DOCTYPE')) {
     return content;
   }
 
-  return `
-    <div style="font-family: Arial, sans-serif; font-size: 15px; color: #111111; line-height: 1.6; padding: 16px;">
-      ${content}
-    </div>
-  `;
+  // Detect verification code if present (4 to 8 digits)
+  const codeMatch = typeof content === 'string' ? content.match(/\b\d{4,8}\b/) : null;
+  const extractedCode = codeMatch ? codeMatch[0] : null;
+
+  // Header Brand styling matching reference
+  const headerBrandHtml = siteLogo
+    ? `<img src="${siteLogo}" alt="${siteName}" style="max-height: 44px; max-width: 200px; object-fit: contain; display: block; margin: 0 auto;" />`
+    : `<div style="text-align: center;"><span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 26px; font-weight: 900; color: #ffffff; letter-spacing: 1px; text-transform: uppercase;">EVER<span style="color: #ff0044;">STAKE</span></span></div>`;
+
+  let innerContentHtml = content;
+
+  if (typeof content === 'string') {
+    let cleanContent = stripEmojisAndIcons(content);
+
+    if (extractedCode || emailType === 'PIN_RESET_OTP' || emailType === 'EMAIL_VERIFICATION' || emailType === 'VERIFICATION' || emailType === 'PASSWORD_RESET') {
+      const displayCode = extractedCode || '******';
+      const formattedCode = displayCode.split('').join(' ');
+
+      innerContentHtml = `
+        <div style="font-size: 16px; color: #ffffff; font-weight: 700; margin-bottom: 16px;">
+          Hi User,
+        </div>
+        <div style="color: #94a3b8; font-size: 14.5px; line-height: 1.6; margin-bottom: 24px;">
+          You recently requested a security verification code for your <b style="color: #ffffff;">${siteName}</b> account. Please use the OTP code below to complete the process:
+        </div>
+
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center" style="margin: 28px auto; border-collapse: collapse;">
+          <tr>
+            <td align="center" style="background-color: #0d9488; border-radius: 12px; padding: 14px 36px; text-align: center;">
+              <span style="font-family: 'Courier New', Courier, monospace; font-size: 32px; font-weight: 900; letter-spacing: 6px; color: #ffffff !important; text-decoration: none; display: inline-block;">
+                ${formattedCode}
+              </span>
+            </td>
+          </tr>
+        </table>
+
+        <div style="color: #94a3b8; font-size: 14px; line-height: 1.6; margin-bottom: 16px;">
+          This OTP is valid for <b style="color: #ffffff;">10 minutes</b>. For your security, do not share this code with anyone.
+        </div>
+
+        <div style="color: #64748b; font-size: 13px; line-height: 1.6;">
+          If you didn't request this code, you can safely ignore this email. Your account will remain secure.
+        </div>
+      `;
+    } else {
+      innerContentHtml = `
+        <div style="color: #cbd5e1; font-size: 14.5px; line-height: 1.7;">
+          ${cleanContent}
+        </div>
+      `;
+    }
+  }
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${cleanSubject}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #060e20; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #e2e8f0; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #060e20; width: 100%; min-height: 100vh; padding: 32px 12px;">
+    <tr>
+      <td align="center" valign="top">
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 520px; background-color: #101828; border: 1px solid #1e293b; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+          <!-- Header Bar -->
+          <tr>
+            <td align="center" style="background-color: #0b1329; padding: 32px 24px; text-align: center; border-bottom: 1px solid #1e293b;">
+              ${headerBrandHtml}
+              <div style="font-size: 13px; color: #94a3b8; font-weight: 500; margin-top: 6px; letter-spacing: 0.5px;">
+                Simple. Secure. Smart Investing.
+              </div>
+            </td>
+          </tr>
+          <!-- Body Content Area -->
+          <tr>
+            <td style="padding: 36px 28px; background-color: #101828; color: #e2e8f0;">
+              ${innerContentHtml}
+            </td>
+          </tr>
+          <!-- Footer Area -->
+          <tr>
+            <td align="center" style="background-color: #0b1329; padding: 24px 20px; border-top: 1px solid #1e293b; text-align: center;">
+              <div style="font-size: 12.5px; color: #94a3b8; line-height: 1.6;">
+                &copy; ${new Date().getFullYear()} <b style="color: #ffffff;">${siteName}</b>. All rights reserved.
+              </div>
+              <div style="font-size: 12px; color: #64748b; margin-top: 4px;">
+                Your trusted investment partner.
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
 }
 
 export const sendEmail = async ({ to, subject, html, emailType, userId }) => {
