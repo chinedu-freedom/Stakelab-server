@@ -162,33 +162,97 @@ export const createStake = async (req, res) => {
 
 export const getUserStakes = async (req, res) => {
   try {
+    const userId = req.user.id;
     const stakes = await prisma.user_stakes.findMany({
-      where: { user_id: req.user.id },
+      where: { user_id: userId },
       include: { plan: true },
       orderBy: { created_at: 'desc' },
     });
 
-    const stakesWithCompounding = stakes.map((s) => {
-      const amount = parseFloat(s.amount);
-      const dailyReturnPercent = parseFloat(s.plan.daily_return_percent);
-      const daysElapsed = Math.min(
-        s.plan.duration_days || 30,
-        Math.max(1, Math.floor((new Date() - new Date(s.start_date)) / (1000 * 60 * 60 * 24)))
-      );
+    let totalNewProfitToCredit = 0;
+    const now = new Date();
 
-      // FV = PV * (1 + r)^n (Compounding mathematical calculation)
-      const compoundedValue = amount * Math.pow(1 + dailyReturnPercent / 100, daysElapsed);
-      const compoundedProfit = compoundedValue - amount;
+    for (const s of stakes) {
+      if (s.status === 'ACTIVE' && s.plan) {
+        const lastClaim = s.last_claim_date || s.start_date || s.created_at;
+        const elapsedHours = (now - new Date(lastClaim)) / (1000 * 60 * 60);
+
+        if (elapsedHours >= 24) {
+          const daysToCredit = Math.floor(elapsedHours / 24);
+          const baseAmount = parseFloat(s.amount) + parseFloat(s.total_earned || 0);
+          const dailyPercent = parseFloat(s.plan.daily_return_percent || 0);
+
+          let profitAdded = 0;
+          let currentBase = baseAmount;
+          for (let d = 0; d < daysToCredit; d++) {
+            const dayProfit = (currentBase * dailyPercent) / 100;
+            profitAdded += dayProfit;
+            currentBase += dayProfit;
+          }
+
+          totalNewProfitToCredit += profitAdded;
+
+          const nextClaimDate = new Date(new Date(lastClaim).getTime() + daysToCredit * 24 * 60 * 60 * 1000);
+          const isCompleted = s.end_date && now >= new Date(s.end_date);
+
+          await prisma.user_stakes.update({
+            where: { id: s.id },
+            data: {
+              total_earned: parseFloat(s.total_earned || 0) + profitAdded,
+              last_claim_date: nextClaimDate,
+              status: isCompleted ? 'COMPLETED' : 'ACTIVE',
+            },
+          }).catch(() => null);
+
+          await prisma.transactions.create({
+            data: {
+              user_id: userId,
+              type: 'STAKE_PROFIT',
+              amount: profitAdded,
+              balance_before: 0,
+              balance_after: profitAdded,
+              reference_id: s.id,
+              description: `Auto-credited daily yield of $${profitAdded.toFixed(2)} from ${s.plan.title || 'Staking Plan'}`,
+            },
+          }).catch(() => null);
+        }
+      }
+    }
+
+    if (totalNewProfitToCredit > 0) {
+      const dbUser = await prisma.users.findUnique({ where: { id: userId } });
+      if (dbUser) {
+        await prisma.users.update({
+          where: { id: userId },
+          data: {
+            staked_balance: parseFloat(dbUser.staked_balance || 0) + totalNewProfitToCredit,
+            total_earned: parseFloat(dbUser.total_earned || 0) + totalNewProfitToCredit,
+          },
+        }).catch(() => null);
+      }
+    }
+
+    const updatedStakes = await prisma.user_stakes.findMany({
+      where: { user_id: userId },
+      include: { plan: true },
+      orderBy: { created_at: 'desc' },
+    });
+
+    const formattedStakes = updatedStakes.map((s) => {
+      const amount = parseFloat(s.amount || 0);
+      const dailyReturnPercent = parseFloat(s.plan?.daily_return_percent || 0);
+      const durationDays = s.plan?.duration_days || 30;
+      const dailyProfit = (amount * dailyReturnPercent) / 100;
+      const expectedTotalReturn = amount + (dailyProfit * durationDays);
 
       return {
         ...s,
-        is_compounding: true,
-        current_compounded_value: compoundedValue.toFixed(2),
-        compounded_profit_earned: compoundedProfit.toFixed(2),
+        daily_profit: dailyProfit,
+        expected_total_return: expectedTotalReturn,
       };
     });
 
-    return res.json({ success: true, stakes: stakesWithCompounding });
+    return res.json({ success: true, stakes: formattedStakes });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to fetch user stakes', error: error.message });
   }
