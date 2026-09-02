@@ -48,32 +48,41 @@ function renderEmailTemplate({ siteName, siteLogo, subject, content, emailType }
 
     if (isNotification) {
       innerContentHtml = `
-        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin-bottom: 10px;">
-          <div style="font-size: 11px; font-weight: 800; color: #ff0044; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">Official Announcement</div>
-          <h2 style="color: #0f172a; font-size: 18px; font-weight: 800; margin-top: 0; margin-bottom: 14px;">${cleanSubject}</h2>
-          <div style="color: #334155; font-size: 14px; line-height: 1.7;">
+        <div style="background-color: #07132a; border: 1px solid #1a2c54; border-radius: 14px; padding: 26px; margin-bottom: 10px;">
+          <div style="font-size: 11px; font-weight: 800; color: #ff0044; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px;">Official Announcement</div>
+          <h2 style="color: #ffffff !important; font-size: 18px; font-weight: 800; margin-top: 0; margin-bottom: 14px;">${cleanSubject}</h2>
+          <div style="color: #cbd5e1 !important; font-size: 14px; line-height: 1.7;">
             ${cleanContent}
           </div>
         </div>
       `;
-    } else if (extractedCode && (emailType === 'PIN_RESET_OTP' || emailType === 'EMAIL_VERIFICATION' || cleanSubject.toLowerCase().includes('pin') || cleanSubject.toLowerCase().includes('code') || cleanSubject.toLowerCase().includes('otp') || cleanSubject.toLowerCase().includes('verify'))) {
+    } else if (extractedCode || emailType === 'PIN_RESET_OTP' || emailType === 'EMAIL_VERIFICATION' || emailType === 'VERIFICATION' || emailType === 'PASSWORD_RESET') {
+      const displayCode = extractedCode || '******';
       innerContentHtml = `
-        <div style="text-align: center; margin-bottom: 20px;">
-          <h2 style="color: #0f172a; font-size: 20px; font-weight: 800; margin: 0 0 8px 0;">${cleanSubject}</h2>
-          <p style="color: #64748b; font-size: 13px; margin: 0;">Please use the verification code below to authorize your request.</p>
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h2 style="color: #0f172a !important; font-size: 20px; font-weight: 800; margin: 0 0 8px 0;">${cleanSubject}</h2>
+          <p style="color: #475569 !important; font-size: 14px; margin: 0; line-height: 1.5;">Please use the security verification code below to authorize your request.</p>
         </div>
 
-        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px 16px; text-align: center; margin: 20px 0;">
-          <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #64748b; letter-spacing: 1.5px; margin-bottom: 12px;">Verification Code</div>
-          <div style="display: inline-block; background-color: #0d9488; color: #ffffff; font-family: 'Courier New', Courier, monospace; font-size: 32px; font-weight: 800; letter-spacing: 8px; padding: 12px 28px; border-radius: 8px;">
-            ${extractedCode}
-          </div>
-          <div style="font-size: 12px; color: #64748b; margin-top: 14px;">This code is valid for <b>10 minutes</b>. For your security, do not share this code with anyone.</div>
+        <div style="background-color: #f8fafc; border: 2px solid #e2e8f0; border-radius: 16px; padding: 28px 20px; text-align: center; margin: 20px 0;">
+          <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: #475569 !important; letter-spacing: 2px; margin-bottom: 16px;">Security Verification Code</div>
+          
+          <table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center" style="margin: 0 auto; border-collapse: collapse;">
+            <tr>
+              <td align="center" style="background-color: #ff0044 !important; border-radius: 10px; padding: 14px 32px; text-align: center;">
+                <span style="font-family: 'Courier New', Courier, monospace; font-size: 34px; font-weight: 900; letter-spacing: 8px; color: #ffffff !important; -webkit-text-fill-color: #ffffff !important; text-decoration: none; display: inline-block;">
+                  ${displayCode}
+                </span>
+              </td>
+            </tr>
+          </table>
+
+          <div style="font-size: 12.5px; color: #64748b !important; margin-top: 18px; line-height: 1.5;">This code is valid for <b>10 minutes</b>. For your account security, do not share this code with anyone.</div>
         </div>
       `;
     } else {
       innerContentHtml = `
-        <div style="color: #334155; font-size: 14px; line-height: 1.7;">
+        <div style="color: #334155 !important; font-size: 14px; line-height: 1.7;">
           ${cleanContent}
         </div>
       `;
@@ -85,6 +94,8 @@ function renderEmailTemplate({ siteName, siteLogo, subject, content, emailType }
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-schemes" content="light dark">
   <title>${cleanSubject}</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #334155; -webkit-font-smoothing: antialiased;">
