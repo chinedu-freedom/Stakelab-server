@@ -39,35 +39,44 @@ export function renderEmailTemplate({ siteName, siteLogo, subject, content, emai
   const codeMatch = typeof content === 'string' ? content.match(/\b\d{4,8}\b/) : null;
   const extractedCode = codeMatch ? codeMatch[0] : null;
 
-  // Header Brand styling with dynamic Logo support
+  // Dynamic Header Logo / Site Name
   const headerBrandHtml = siteLogo
-    ? `<img src="${siteLogo}" alt="${siteName}" style="max-height: 48px; max-width: 220px; object-fit: contain; display: block; margin: 0 auto;" />`
-    : `<h1 style="color:#ffffff; margin:0; font-size:28px; letter-spacing:1px; font-weight: 900; text-transform: uppercase; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">${siteName}</h1>`;
+    ? `<img src="${siteLogo}" alt="${siteName}" style="max-height: 48px; max-width: 240px; object-fit: contain; display: block; margin: 0 auto;" />`
+    : `<h1 style="color:#ffffff; margin:0; font-size:28px; letter-spacing:1px; font-weight: 900; text-transform: uppercase;">${siteName}</h1>`;
 
   let innerContentHtml = content;
 
   if (typeof content === 'string') {
-    let cleanContent = stripEmojisAndIcons(content).replace(/everstake|stakelab/gi, siteName);
+    let cleanContent = stripEmojisAndIcons(content);
 
     if (extractedCode || emailType === 'PIN_RESET_OTP' || emailType === 'EMAIL_VERIFICATION' || emailType === 'VERIFICATION' || emailType === 'PASSWORD_RESET') {
       const displayCode = extractedCode || '******';
 
       innerContentHtml = `
         <div style="text-align:center; padding:10px 0;">
-          <h2 style="color:#0f172a; margin-bottom:10px; font-size: 20px; font-weight: 700;">${cleanSubject}</h2>
+          <h2 style="color:#0f172a; margin-bottom:10px;">${cleanSubject}</h2>
           <p style="color:#475569; font-size:15px; line-height:1.6; margin-bottom: 20px;">
             Please use the confirmation code below to authorize your request:
           </p>
 
-          <table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center" style="margin: 20px auto; border-collapse: collapse;">
-            <tr>
-              <td align="center" valign="middle" style="background-color: #fff1f2; border: 2px dashed #ff0044; border-radius: 12px; padding: 12px 24px; text-align: center; white-space: nowrap !important;">
-                <font face="'Courier New', Courier, monospace" style="font-family: 'Courier New', Courier, monospace; font-size: 24px; font-weight: 900; letter-spacing: 4px; color: #ff0044; white-space: nowrap !important;">
-                  <nobr style="white-space: nowrap !important;">${displayCode}</nobr>
-                </font>
-              </td>
-            </tr>
-          </table>
+          <div style="margin:24px 0; text-align:center;">
+            <span style="
+              background: #fff1f2;
+              color: #ff0044;
+              padding: 12px 24px;
+              font-size: 24px;
+              font-weight: 800;
+              letter-spacing: 6px;
+              border: 2px dashed #ff0044;
+              border-radius: 12px;
+              display: inline-block;
+              white-space: nowrap !important;
+              word-break: keep-all !important;
+              max-width: 90%;
+            ">
+              ${displayCode}
+            </span>
+          </div>
 
           <p style="font-size:14px; color:#64748b; margin-top:16px;">
             This code is valid for <strong>10 minutes</strong>. Never share this code with anyone.
@@ -91,16 +100,9 @@ export function renderEmailTemplate({ siteName, siteLogo, subject, content, emai
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${cleanSubject}</title>
 </head>
 <body style="margin:0; padding:0; background-color:#ffffff; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
-  <!-- Hidden Preheader Text to Prevent Mobile Gmail Thread Clipping -->
-  <div style="display:none; font-size:1px; color:#ffffff; line-height:1px; max-height:0px; max-width:0px; opacity:0; overflow:hidden; mso-hide:all;">
-    ${cleanSubject} ${extractedCode ? `- Verification Code: ${extractedCode}` : ''}
-    &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
-  </div>
-  <!-- <!-- ID: ${Date.now()} --> -->
-  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#ffffff; width: 100%; border-collapse: collapse;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#ffffff; padding:0; margin:0; width:100%;">
      <tr>
       <td align="center">
         <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width:600px; background-color:#ffffff; overflow:hidden;">
@@ -112,13 +114,13 @@ export function renderEmailTemplate({ siteName, siteLogo, subject, content, emai
           </tr>
           <!-- Body -->
           <tr>
-            <td style="padding:32px 24px; background-color:#ffffff;">
+            <td style="padding:32px 24px;">
               ${innerContentHtml}
             </td>
           </tr>
           <!-- Footer -->
           <tr>
-            <td style="background-color:#f8fafc; padding:24px 20px; text-align:center; border-top: 1px solid #f1f5f9;">
+            <td style="background-color:#f1f5f9; padding:24px 20px; text-align:center;">
               <p style="margin:0; color:#64748b; font-size:13px; line-height:1.6;">
                 &copy; ${new Date().getFullYear()} ${siteName}. All rights reserved.<br>
                 You received this email because you are registered on ${siteName}.
