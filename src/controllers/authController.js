@@ -59,18 +59,22 @@ export const register = async (req, res) => {
         OR: [
           { email },
           ...(username ? [{ username }] : []),
+          ...(mobile ? [{ mobile }] : []),
         ],
       },
     });
 
     if (existingUser) {
       if (existingUser.email.toLowerCase() === email.toLowerCase()) {
-        return res.status(400).json({ success: false, message: 'User with this email already exists' });
+        return res.status(400).json({ success: false, message: 'A user with this email address already exists' });
       }
       if (username && existingUser.username && existingUser.username.toLowerCase() === username.toLowerCase()) {
         return res.status(400).json({ success: false, message: 'This username is already taken' });
       }
-      return res.status(400).json({ success: false, message: 'User with this email already exists' });
+      if (mobile && existingUser.mobile && existingUser.mobile === mobile) {
+        return res.status(400).json({ success: false, message: 'A user with this phone number already exists' });
+      }
+      return res.status(400).json({ success: false, message: 'A user with this email, username, or phone number already exists' });
     }
 
     let referrerId = null;

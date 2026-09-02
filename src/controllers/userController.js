@@ -89,6 +89,24 @@ export const updateUserData = async (req, res) => {
       return res.status(400).json({ success: false, message: 'All fields are required' });
     }
 
+    if (mobile) {
+      const existingMobile = await prisma.users.findFirst({
+        where: { mobile, id: { not: userId } },
+      });
+      if (existingMobile) {
+        return res.status(400).json({ success: false, message: 'This phone number is already registered to another account' });
+      }
+    }
+
+    if (username) {
+      const existingUsername = await prisma.users.findFirst({
+        where: { username, id: { not: userId } },
+      });
+      if (existingUsername) {
+        return res.status(400).json({ success: false, message: 'This username is already taken' });
+      }
+    }
+
     const updatedUser = await prisma.users.update({
       where: { id: userId },
       data: {
