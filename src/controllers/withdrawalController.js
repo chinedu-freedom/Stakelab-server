@@ -26,7 +26,7 @@ export const createWithdrawal = async (req, res) => {
     if (!activeStake) {
       return res.status(400).json({
         success: false,
-        message: 'Withdrawal locked! You must have an active investment package to process withdrawals.',
+        message: 'Withdrawal Failed! An active investment is required to process withdrawals. Kindly activate one and try again.',
       });
     }
 
