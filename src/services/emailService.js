@@ -59,23 +59,15 @@ export function renderEmailTemplate({ siteName, siteLogo, subject, content, emai
             Please use the confirmation code below to authorize your request:
           </p>
 
-          <div style="margin:24px 0; text-align:center;">
-            <span style="
-              background: #fff1f2;
-              color: #ff0044;
-              padding: 14px 28px;
-              font-size: 26px;
-              font-weight: 900;
-              letter-spacing: 6px;
-              border: 2px dashed #ff0044;
-              border-radius: 12px;
-              display: inline-block;
-              white-space: nowrap !important;
-              font-family: 'Courier New', Courier, monospace;
-            ">
-              ${displayCode}
-            </span>
-          </div>
+          <table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center" style="margin: 20px auto; border-collapse: collapse;">
+            <tr>
+              <td align="center" valign="middle" style="background-color: #fff1f2; border: 2px dashed #ff0044; border-radius: 12px; padding: 12px 24px; text-align: center; white-space: nowrap !important;">
+                <font face="'Courier New', Courier, monospace" style="font-family: 'Courier New', Courier, monospace; font-size: 24px; font-weight: 900; letter-spacing: 4px; color: #ff0044; white-space: nowrap !important;">
+                  <nobr style="white-space: nowrap !important;">${displayCode}</nobr>
+                </font>
+              </td>
+            </tr>
+          </table>
 
           <p style="font-size:14px; color:#64748b; margin-top:16px;">
             This code is valid for <strong>10 minutes</strong>. Never share this code with anyone.
