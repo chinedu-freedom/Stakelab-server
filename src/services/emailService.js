@@ -44,7 +44,9 @@ export function renderEmailTemplate({ siteName, siteLogo, subject, content, emai
   if (typeof content === 'string') {
     let cleanContent = stripEmojisAndIcons(content);
 
-    if (extractedCode || emailType === 'PIN_RESET_OTP' || emailType === 'EMAIL_VERIFICATION' || emailType === 'VERIFICATION' || emailType === 'PASSWORD_RESET') {
+    const isOtpType = ['PIN_RESET_OTP', 'EMAIL_VERIFICATION', 'VERIFICATION', 'PASSWORD_RESET', 'WITHDRAWAL_OTP', 'OTP'].includes(emailType);
+
+    if (isOtpType) {
       const displayCode = extractedCode || '******';
 
       innerContentHtml = `
