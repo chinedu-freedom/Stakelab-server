@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { register, login, adminLogin, getMe, forgotPassword, verifyOtp, resetPassword, changePassword, resendEmailVerification, verifyEmailCode } from '../controllers/authController.js';
-import { getStakingPlans, createStake, getUserStakes, claimStakeProfit } from '../controllers/stakingController.js';
+import { getStakingPlans, createStake, getUserStakes, claimStakeProfit, unstakePackage } from '../controllers/stakingController.js';
 import { getPaymentMethods, createDeposit, getUserDeposits, oxapayWebhook } from '../controllers/depositController.js';
 import { createWithdrawal, getUserWithdrawals, addOrUpdateUserWallet, getUserWallets } from '../controllers/withdrawalController.js';
 import { createTicket, getUserTickets, getTicketById, replyTicket, getAdminTickets, closeTicket, deleteTicketMessage, reopenTicket } from '../controllers/ticketController.js';
@@ -137,6 +137,7 @@ router.get('/user/referrals', authenticateUser, getUserReferralsData);
 router.post('/staking/stake', authenticateUser, createStake);
 router.get('/staking/my-stakes', authenticateUser, getUserStakes);
 router.post('/staking/claim', authenticateUser, claimStakeProfit);
+router.post('/staking/unstake', authenticateUser, unstakePackage);
 router.post('/deposits', authenticateUser, createDeposit);
 router.post('/user/deposits', authenticateUser, createDeposit);
 router.get('/deposits', authenticateUser, getUserDeposits);

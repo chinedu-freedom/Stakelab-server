@@ -302,6 +302,69 @@ export const getUserStakes = async (req, res) => {
   }
 };
 
+export const unstakePackage = async (req, res) => {
+  try {
+    const { stake_id } = req.body;
+    const userId = req.user.id;
+
+    const stake = await prisma.user_stakes.findFirst({
+      where: { id: stake_id, user_id: userId },
+      include: { plan: true },
+    });
+
+    if (!stake) {
+      return res.status(404).json({ success: false, message: 'Investment package not found.' });
+    }
+
+    if (stake.status !== 'ACTIVE') {
+      return res.status(400).json({ success: false, message: 'Only active investment packages can be unstaked.' });
+    }
+
+    const isFixed = stake.plan?.is_fixed_deposit !== false;
+    if (isFixed) {
+      return res.status(400).json({
+        success: false,
+        message: 'Unstake locked! This is a Fixed Deposit plan and funds are locked until the maturity date.',
+      });
+    }
+
+    // Flexible Deposit: Refund initial principal back to user balance and mark stake as UNSTAKED
+    const principalAmt = parseFloat(stake.amount || 0);
+    const dbUser = await prisma.users.findUnique({ where: { id: userId } });
+
+    const oldBal = parseFloat(dbUser.balance || 0);
+    const newBal = oldBal + principalAmt;
+
+    await prisma.$transaction([
+      prisma.user_stakes.update({
+        where: { id: stake.id },
+        data: { status: 'UNSTAKED' },
+      }),
+      prisma.users.update({
+        where: { id: userId },
+        data: { balance: newBal },
+      }),
+      prisma.transactions.create({
+        data: {
+          user_id: userId,
+          type: 'ADMIN_CREDIT',
+          amount: principalAmt,
+          balance_before: oldBal,
+          balance_after: newBal,
+          description: `Early unstake principal refund for ${stake.plan?.title || 'Flexible Plan'}`,
+        },
+      }),
+    ]);
+
+    return res.json({
+      success: true,
+      message: `Successfully unstaked $${principalAmt.toFixed(2)} back to your Staking Wallet!`,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to unstake package', error: error.message });
+  }
+};
+
 export const claimStakeProfit = async (req, res) => {
   try {
     const { stake_id } = req.body;
