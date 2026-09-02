@@ -1,5 +1,5 @@
 import { prisma } from '../config/db.js';
-import { sendEmail } from '../services/emailService.js';
+import { sendEmail, sendAdminNotificationEmail } from '../services/emailService.js';
 
 export const createWithdrawal = async (req, res) => {
   try {
@@ -99,25 +99,31 @@ export const createWithdrawal = async (req, res) => {
               <td style="font-weight: 800; color: #0f172a;">$${withdrawAmount.toFixed(2)}</td>
             </tr>
             <tr style="border-bottom: 1px solid #e2e8f0;">
-              <td style="font-weight: 700; color: #475569;">Withdrawal Status</td>
-              <td style="font-weight: 700; color: #d97706;">Pending</td>
+              <td style="font-weight: 700; color: #475569;">Wallet Source</td>
+              <td style="color: #0f172a;">${walletLabel}</td>
             </tr>
             <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
-              <td style="font-weight: 700; color: #475569;">Withdrawal Method</td>
+              <td style="font-weight: 700; color: #475569;">Payout Method</td>
               <td style="color: #0f172a;">${withdrawal_method}</td>
             </tr>
             <tr style="border-bottom: 1px solid #e2e8f0;">
               <td style="font-weight: 700; color: #475569;">Destination Address</td>
-              <td style="font-family: monospace; font-size: 12px; color: #334155; word-break: break-all;">"${wallet_address}"</td>
+              <td style="color: #0f172a; font-family: monospace;">${wallet_address}</td>
             </tr>
           </tbody>
         </table>
         <p style="color: #64748b; font-size: 13px; margin-top: 20px; line-height: 1.6;">If you did not initiate this transaction, please contact our support team as soon as possible.</p>
-        <p style="color: #0f172a; font-weight: 700; margin-top: 16px;">Thank you for choosing EverStake.</p>
+        <p style="color: #0f172a; font-weight: 700; margin-top: 20px;">Thank you for choosing EverStake.</p>
       `,
       emailType: 'WITHDRAWAL_PROCESSING',
       userId,
     });
+
+    sendAdminNotificationEmail({
+      subject: `New Withdrawal Request: $${withdrawAmount.toFixed(2)} USDT from @${user.username || user.full_name}`,
+      title: 'New Withdrawal Request Submitted',
+      details: `<p>A user requested a payout withdrawal:</p><ul><li><b>User:</b> @${user.username || user.full_name} (${user.email})</li><li><b>Amount:</b> $${withdrawAmount.toFixed(2)} USDT</li><li><b>Wallet Source:</b> ${walletLabel}</li><li><b>Method:</b> ${withdrawal_method}</li><li><b>Destination Address:</b> ${wallet_address}</li></ul>`,
+    }).catch(() => null);
 
     return res.status(201).json({
       success: true,

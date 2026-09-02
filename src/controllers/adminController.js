@@ -1514,28 +1514,57 @@ export const adminChangeVerificationPassword = async (req, res) => {
 
 export const getAdminNotifications = async (req, res) => {
   try {
-    const pendingTickets = await prisma.support_tickets.findMany({
-      where: { status: 'PENDING' },
-      take: 5,
-      orderBy: { updated_at: 'desc' },
-      include: { user: { select: { username: true, full_name: true } } },
-    });
+    const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
 
-    const pendingDeposits = await prisma.deposits.findMany({
-      where: { status: 'PENDING' },
-      take: 5,
-      orderBy: { created_at: 'desc' },
-      include: { user: { select: { username: true, full_name: true } } },
-    });
+    const [pendingTickets, pendingDeposits, pendingWithdrawals, recentSignups, recentLogins, recentStakes] = await Promise.all([
+      prisma.support_tickets.findMany({
+        where: { status: { in: ['OPEN', 'PENDING'] } },
+        take: 5,
+        orderBy: { updated_at: 'desc' },
+        include: { user: { select: { username: true, full_name: true } } },
+      }),
+      prisma.deposits.findMany({
+        where: { status: 'PENDING' },
+        take: 5,
+        orderBy: { created_at: 'desc' },
+        include: { user: { select: { username: true, full_name: true } } },
+      }),
+      prisma.withdrawals.findMany({
+        where: { status: 'PENDING' },
+        take: 5,
+        orderBy: { created_at: 'desc' },
+        include: { user: { select: { username: true, full_name: true } } },
+      }),
+      prisma.users.findMany({
+        where: { created_at: { gte: fortyEightHoursAgo } },
+        take: 5,
+        orderBy: { created_at: 'desc' },
+        select: { id: true, username: true, full_name: true, email: true, created_at: true },
+      }),
+      prisma.activity_logs.findMany({
+        where: { action: 'LOGIN', created_at: { gte: fortyEightHoursAgo } },
+        take: 5,
+        orderBy: { created_at: 'desc' },
+        include: { user: { select: { username: true, full_name: true } } },
+      }),
+      prisma.user_stakes.findMany({
+        where: { created_at: { gte: fortyEightHoursAgo } },
+        take: 5,
+        orderBy: { created_at: 'desc' },
+        include: {
+          user: { select: { username: true, full_name: true } },
+          plan: { select: { title: true } },
+        },
+      }),
+    ]);
 
-    const pendingWithdrawals = await prisma.withdrawals.findMany({
-      where: { status: 'PENDING' },
-      take: 5,
-      orderBy: { created_at: 'desc' },
-      include: { user: { select: { username: true, full_name: true } } },
-    });
-
-    const totalUnreadCount = pendingTickets.length + pendingDeposits.length + pendingWithdrawals.length;
+    const totalUnreadCount =
+      pendingTickets.length +
+      pendingDeposits.length +
+      pendingWithdrawals.length +
+      recentSignups.length +
+      recentLogins.length +
+      recentStakes.length;
 
     return res.json({
       success: true,
@@ -1543,6 +1572,9 @@ export const getAdminNotifications = async (req, res) => {
       tickets: pendingTickets,
       deposits: pendingDeposits,
       withdrawals: pendingWithdrawals,
+      signups: recentSignups,
+      logins: recentLogins,
+      stakes: recentStakes,
     });
   } catch (err) {
     console.error('Error fetching admin notifications:', err);

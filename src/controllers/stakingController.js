@@ -1,5 +1,5 @@
 import { prisma } from '../config/db.js';
-import { sendEmail } from '../services/emailService.js';
+import { sendEmail, sendAdminNotificationEmail } from '../services/emailService.js';
 import { processReferralCommissions } from './adminController.js';
 
 export const getStakingPlans = async (req, res) => {
@@ -139,6 +139,12 @@ export const createStake = async (req, res) => {
     } catch (err) {
       console.error('Staking bonus processing error:', err);
     }
+
+    sendAdminNotificationEmail({
+      subject: `New Investment: $${stakeAmount.toFixed(2)} in ${plan.title} by @${user.username || user.full_name}`,
+      title: 'New Staking Investment Created',
+      details: `<p>A user invested in a staking plan:</p><ul><li><b>User:</b> @${user.username || user.full_name} (${user.email})</li><li><b>Plan:</b> ${plan.title}</li><li><b>Amount:</b> $${stakeAmount.toFixed(2)} USDT</li><li><b>Daily Return:</b> ${plan.daily_return_percent}%</li></ul>`,
+    }).catch(() => null);
 
     return res.status(201).json({
       success: true,

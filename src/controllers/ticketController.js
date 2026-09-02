@@ -1,4 +1,5 @@
 import { prisma } from '../config/db.js';
+import { sendAdminNotificationEmail } from '../services/emailService.js';
 
 export const createTicket = async (req, res) => {
   try {
@@ -31,6 +32,12 @@ export const createTicket = async (req, res) => {
         messages: true,
       },
     });
+
+    sendAdminNotificationEmail({
+      subject: `New Support Ticket ${ticketId}: ${subject}`,
+      title: 'New Support Ticket Created',
+      details: `<p>A user created a new support ticket:</p><ul><li><b>Ticket ID:</b> ${ticketId}</li><li><b>User:</b> @${user.username || user.full_name} (${user.email})</li><li><b>Subject:</b> ${subject}</li><li><b>Priority:</b> ${priority || 'Medium'}</li><li><b>Message:</b> ${message}</li></ul>`,
+    }).catch(() => null);
 
     return res.status(201).json({
       success: true,

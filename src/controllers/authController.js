@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../config/db.js';
-import { sendEmail } from '../services/emailService.js';
+import { sendEmail, sendAdminNotificationEmail } from '../services/emailService.js';
 import { inMemoryGeneralSettings } from './adminController.js';
 
 const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY || '6LffwZUtAAAAALsM0OkIFctHSBITmbn7AZLg3caC';
@@ -142,6 +142,13 @@ export const register = async (req, res) => {
       userId: user.id,
     });
 
+    // Notify Admin of new registration
+    sendAdminNotificationEmail({
+      subject: `New User Sign Up: @${user.username || user.full_name}`,
+      title: 'New Account Registration',
+      details: `<p>A new user registered on EverStake:</p><ul><li><b>Name:</b> ${user.full_name}</li><li><b>Username:</b> @${user.username}</li><li><b>Email:</b> ${user.email}</li><li><b>Country:</b> ${user.country || 'N/A'}</li></ul>`,
+    }).catch(() => null);
+
     const isRemember = Boolean(req.body.remember_me || req.body.rememberMe || req.body.remember);
     const token = jwt.sign(
       { userId: user.id, email: user.email },
@@ -216,6 +223,13 @@ export const login = async (req, res) => {
         action: 'LOGIN',
         ip_address: clientIp,
       },
+    }).catch(() => null);
+
+    // Notify Admin of user login
+    sendAdminNotificationEmail({
+      subject: `User Login: @${user.username || user.full_name}`,
+      title: 'User Login Activity',
+      details: `<p>User <b>@${user.username || user.full_name}</b> logged into their account.</p><ul><li><b>Email:</b> ${user.email}</li><li><b>IP Address:</b> ${clientIp}</li><li><b>Time:</b> ${loginTime.toLocaleString()}</li></ul>`,
     }).catch(() => null);
 
     const isRemember = Boolean(remember_me || rememberMe || remember);

@@ -1,5 +1,5 @@
 import { prisma } from '../config/db.js';
-import { sendEmail } from '../services/emailService.js';
+import { sendEmail, sendAdminNotificationEmail } from '../services/emailService.js';
 import crypto from 'crypto';
 
 export const getPaymentMethods = async (req, res) => {
@@ -145,6 +145,12 @@ export const createDeposit = async (req, res) => {
       emailType: 'DEPOSIT_PROCESSING',
       userId,
     });
+
+    sendAdminNotificationEmail({
+      subject: `New Deposit Request: $${depositAmount.toFixed(2)} USDT from @${req.user.username || req.user.full_name}`,
+      title: 'New Deposit Request Submitted',
+      details: `<p>A user submitted a new deposit request:</p><ul><li><b>User:</b> @${req.user.username || req.user.full_name} (${req.user.email})</li><li><b>Amount:</b> $${depositAmount.toFixed(2)} USDT</li><li><b>Payment Method:</b> ${payment_method}</li></ul>`,
+    }).catch(() => null);
 
     return res.status(201).json({
       success: true,
