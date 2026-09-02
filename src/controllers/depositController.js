@@ -306,3 +306,38 @@ export const getUserDeposits = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to fetch deposits', error: error.message });
   }
 };
+
+export const checkDepositStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const deposit = await prisma.deposits.findFirst({
+      where: {
+        user_id: userId,
+        OR: [
+          { id: id },
+          { track_id: String(id) },
+        ],
+      },
+    });
+
+    if (!deposit) {
+      return res.status(404).json({ success: false, message: 'Deposit record not found' });
+    }
+
+    const rawStatus = (deposit.status || '').toUpperCase();
+    const isConfirmed = ['APPROVED', 'COMPLETED', 'SUCCESSFUL', 'SUCCESS'].includes(rawStatus);
+
+    return res.json({
+      success: true,
+      status: deposit.status,
+      isConfirmed,
+      amount: parseFloat(deposit.amount || 0),
+      paymentMethod: deposit.payment_method,
+      deposit,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to check deposit status', error: error.message });
+  }
+};
