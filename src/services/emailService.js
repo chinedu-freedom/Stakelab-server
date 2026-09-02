@@ -60,25 +60,36 @@ function renderEmailTemplate({ siteName, siteLogo, subject, content, emailType }
       const displayCode = extractedCode || '******';
       innerContentHtml = `
         <div style="text-align: center; margin-bottom: 24px;">
-          <h2 style="color: #0f172a !important; font-size: 20px; font-weight: 800; margin: 0 0 8px 0;">${cleanSubject}</h2>
-          <p style="color: #475569 !important; font-size: 14px; margin: 0; line-height: 1.5;">Please use the security verification code below to authorize your request.</p>
+          <h2 style="color: #0f172a; font-size: 20px; font-weight: 800; margin: 0 0 8px 0;">${cleanSubject}</h2>
+          <p style="color: #475569; font-size: 14px; margin: 0; line-height: 1.5;">Please use the security verification code below to authorize your request.</p>
         </div>
 
-        <div style="background-color: #f8fafc; border: 2px solid #e2e8f0; border-radius: 16px; padding: 28px 20px; text-align: center; margin: 20px 0;">
-          <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: #475569 !important; letter-spacing: 2px; margin-bottom: 16px;">Security Verification Code</div>
-          
-          <table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center" style="margin: 0 auto; border-collapse: collapse;">
-            <tr>
-              <td align="center" style="background-color: #ff0044 !important; border-radius: 10px; padding: 14px 32px; text-align: center;">
-                <span style="font-family: 'Courier New', Courier, monospace; font-size: 34px; font-weight: 900; letter-spacing: 8px; color: #ffffff !important; -webkit-text-fill-color: #ffffff !important; text-decoration: none; display: inline-block;">
-                  ${displayCode}
-                </span>
-              </td>
-            </tr>
-          </table>
+        <!-- Dark-mode proof OTP Box using Linear Gradient Background -->
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 20px 0; border-collapse: collapse;">
+          <tr>
+            <td align="center" style="background-color: #0c1424 !important; background-image: linear-gradient(#0c1424, #0c1424) !important; border: 1px solid #1e2d4a; border-radius: 16px; padding: 28px 20px; text-align: center;">
+              
+              <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important; letter-spacing: 2px; margin-bottom: 16px;">
+                Security Verification Code
+              </div>
 
-          <div style="font-size: 12.5px; color: #64748b !important; margin-top: 18px; line-height: 1.5;">This code is valid for <b>10 minutes</b>. For your account security, do not share this code with anyone.</div>
-        </div>
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center" style="margin: 0 auto; border-collapse: collapse;">
+                <tr>
+                  <td align="center" style="background-color: #ff0044 !important; background-image: linear-gradient(#ff0044, #ff0044) !important; border-radius: 10px; padding: 14px 32px; text-align: center;">
+                    <span style="font-family: 'Courier New', Courier, monospace; font-size: 34px; font-weight: 900; letter-spacing: 8px; color: #ffffff !important; -webkit-text-fill-color: #ffffff !important; text-decoration: none; display: inline-block;">
+                      ${displayCode}
+                    </span>
+                  </td>
+                </tr>
+              </table>
+
+              <div style="font-size: 12.5px; color: #cbd5e1 !important; -webkit-text-fill-color: #cbd5e1 !important; margin-top: 18px; line-height: 1.5;">
+                This code is valid for <b>10 minutes</b>. For your account security, do not share this code with anyone.
+              </div>
+
+            </td>
+          </tr>
+        </table>
       `;
     } else {
       innerContentHtml = `
