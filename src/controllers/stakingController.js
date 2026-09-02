@@ -144,32 +144,7 @@ export const createStake = async (req, res) => {
       });
     }
 
-    // Staking Bonus Logic
-    try {
-      const stakingCommissionPercent = 5.0;
-      const stakingBonus = (stakeAmount * stakingCommissionPercent) / 100;
-      if (stakingBonus > 0) {
-        const bonusNewBalance = newBalance + stakingBonus;
-        await prisma.$transaction([
-          prisma.users.update({
-            where: { id: userId },
-            data: { balance: bonusNewBalance },
-          }),
-          prisma.transactions.create({
-            data: {
-              user_id: userId,
-              type: 'STAKING_COMMISSION',
-              amount: stakingBonus,
-              balance_before: newBalance,
-              balance_after: bonusNewBalance,
-              description: `Staking Bonus from investing $${stakeAmount} into ${plan.title}`,
-            },
-          }),
-        ]);
-      }
-    } catch (err) {
-      console.error('Staking bonus processing error:', err);
-    }
+
 
     sendAdminNotificationEmail({
       subject: `New Investment: $${stakeAmount.toFixed(2)} in ${plan.title} by @${user.username || user.full_name}`,
