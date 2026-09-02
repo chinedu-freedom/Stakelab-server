@@ -273,8 +273,21 @@ export const getUserStakes = async (req, res) => {
       const amount = parseFloat(s.amount || 0);
       const dailyReturnPercent = parseFloat(s.plan?.daily_return_percent || 0);
       const durationDays = s.plan?.duration_days || 30;
+      const isCompounding = s.plan?.is_compounding !== false;
+      const capitalReturn = s.plan?.capital_return !== false;
+
       const dailyProfit = (amount * dailyReturnPercent) / 100;
-      const expectedTotalReturn = amount + (dailyProfit * durationDays);
+
+      let expectedTotalReturn = amount;
+      if (isCompounding) {
+        expectedTotalReturn = amount * Math.pow(1 + dailyReturnPercent / 100, durationDays);
+      } else {
+        expectedTotalReturn = amount + (dailyProfit * durationDays);
+      }
+
+      if (!capitalReturn) {
+        expectedTotalReturn = Math.max(0, expectedTotalReturn - amount);
+      }
 
       return {
         ...s,
