@@ -1,5 +1,5 @@
 import { prisma } from '../config/db.js';
-import { sendAdminNotificationEmail } from '../services/emailService.js';
+import { sendEmail, sendAdminNotificationEmail } from '../services/emailService.js';
 
 export const createTicket = async (req, res) => {
   try {
@@ -166,6 +166,40 @@ export const replyTicket = async (req, res) => {
         updated_at: new Date(),
       },
     });
+
+    // Notify ticket recipient
+    try {
+      const ticketUser = await prisma.users.findUnique({ where: { id: ticket.user_id } });
+      if (isAdmin && ticketUser?.email) {
+        // Send email to user notifying them of admin reply
+        sendEmail({
+          to: ticketUser.email,
+          subject: `💬 New Reply on Support Ticket ${ticket.ticket_id || ''}`,
+          html: `
+            <div style="font-family: sans-serif; padding: 20px; color: #0f172a; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0;">
+              <h2 style="color: #5b5bf5; font-size: 18px; margin-top: 0; margin-bottom: 12px; border-bottom: 2px solid #5b5bf5; padding-bottom: 8px;">New Support Reply</h2>
+              <p>Hi <b>${ticketUser.full_name || ticketUser.username || 'Valued User'}</b>,</p>
+              <p>Our support team has posted a reply to your support ticket <b>${ticket.ticket_id || ''} (${ticket.subject})</b>:</p>
+              <div style="background: #f8fafc; border-left: 4px solid #5b5bf5; padding: 14px; margin: 16px 0; font-size: 14px; color: #334155; border-radius: 4px; line-height: 1.6;">
+                ${message.replace(/\n/g, '<br/>')}
+              </div>
+              <p style="font-size: 13px; color: #64748b;">Log in to your ${dynamicSiteName} dashboard to view the full ticket thread and reply.</p>
+            </div>
+          `,
+          emailType: 'SUPPORT_TICKET_REPLY',
+          userId: ticketUser.id,
+        }).catch((err) => console.error('Ticket user reply email error:', err));
+      } else if (!isAdmin) {
+        // Send email alert to admin notifying them of user reply
+        sendAdminNotificationEmail({
+          subject: `User Reply on Support Ticket ${ticket.ticket_id || ''}: ${ticket.subject}`,
+          title: 'Support Ticket User Reply',
+          details: `<p><b>User:</b> @${senderName}</p><p><b>Ticket ID:</b> ${ticket.ticket_id || ''}</p><p><b>Subject:</b> ${ticket.subject}</p><p><b>Message:</b></p><blockquote>${message}</blockquote>`,
+        }).catch(() => null);
+      }
+    } catch (notifyErr) {
+      console.error('Ticket reply notification dispatch error:', notifyErr);
+    }
 
     return res.json({ success: true, message: 'Reply sent successfully', reply: newMessage });
   } catch (error) {
