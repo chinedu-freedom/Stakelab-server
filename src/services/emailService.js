@@ -89,10 +89,6 @@ export function renderEmailTemplate({ siteName, siteLogo, subject, content, emai
     }
   }
 
-  const headerLogoHtml = siteLogo
-    ? `<img src="${siteLogo}" alt="${siteName}" style="max-height: 48px; max-width: 240px; object-fit: contain; display: block; margin: 0 auto;" />`
-    : `<h1 style="color:#ffffff; margin:0; font-size:28px; letter-spacing:1px; font-weight: 900; text-transform: uppercase;">${siteName}</h1>`;
-
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -107,7 +103,7 @@ export function renderEmailTemplate({ siteName, siteLogo, subject, content, emai
           <!-- Header -->
           <tr>
             <td style="background-color:#ff0044; padding:30px 40px; text-align:center;">
-              ${headerLogoHtml}
+              <h1 style="color:#ffffff; margin:0; font-size:28px; letter-spacing:1px; font-weight: 900; text-transform: uppercase;">${siteName}</h1>
             </td>
           </tr>
           <!-- Body -->

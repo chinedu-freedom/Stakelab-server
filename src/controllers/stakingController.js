@@ -57,13 +57,10 @@ export const createStake = async (req, res) => {
 
     const user = await prisma.users.findUnique({ where: { id: userId } });
 
-    let sourceBalance = parseFloat(user.balance);
-    if (wallet_type === 'profit') {
-      sourceBalance = parseFloat(user.total_earned || 0);
-    }
+    let sourceBalance = wallet_type === 'profit' ? parseFloat(user.staked_balance || 0) : parseFloat(user.balance || 0);
 
     if (sourceBalance < stakeAmount) {
-      const walletName = wallet_type === 'profit' ? 'Profit Wallet' : 'Main Wallet';
+      const walletName = wallet_type === 'profit' ? 'Profits Wallet' : 'Staking Wallet';
       return res.status(400).json({ success: false, message: `Insufficient balance in ${walletName}` });
     }
 
@@ -72,9 +69,8 @@ export const createStake = async (req, res) => {
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + plan.duration_days);
 
-    const newBalance = wallet_type === 'profit' ? parseFloat(user.balance) : parseFloat(user.balance) - stakeAmount;
-    const newTotalEarned = wallet_type === 'profit' ? parseFloat(user.total_earned || 0) - stakeAmount : parseFloat(user.total_earned || 0);
-    const newStaked = parseFloat(user.staked_balance) + stakeAmount;
+    const newBalance = wallet_type === 'main' ? parseFloat(user.balance || 0) - stakeAmount : parseFloat(user.balance || 0);
+    const newStaked = wallet_type === 'profit' ? parseFloat(user.staked_balance || 0) - stakeAmount : parseFloat(user.staked_balance || 0);
 
     const [stake, updatedUser, tx] = await prisma.$transaction([
       prisma.user_stakes.create({
@@ -92,7 +88,6 @@ export const createStake = async (req, res) => {
         where: { id: userId },
         data: {
           balance: newBalance,
-          total_earned: newTotalEarned,
           staked_balance: newStaked,
         },
       }),
@@ -225,9 +220,9 @@ export const claimStakeProfit = async (req, res) => {
 
     const user = await prisma.users.findUnique({ where: { id: userId } });
 
-    const newBalance = parseFloat(user.balance) + claimAmount;
-    const newTotalEarned = parseFloat(user.total_earned) + claimAmount;
-    const newStakeEarned = parseFloat(stake.total_earned) + claimAmount;
+    const newProfitBalance = parseFloat(user.staked_balance || 0) + claimAmount;
+    const newTotalEarned = parseFloat(user.total_earned || 0) + claimAmount;
+    const newStakeEarned = parseFloat(stake.total_earned || 0) + claimAmount;
 
     let isCompleted = false;
     if (now >= new Date(stake.end_date) && stake.plan.duration_days > 0) {
@@ -246,9 +241,8 @@ export const claimStakeProfit = async (req, res) => {
       prisma.users.update({
         where: { id: userId },
         data: {
-          balance: newBalance,
+          staked_balance: newProfitBalance,
           total_earned: newTotalEarned,
-          ...(isCompleted ? { staked_balance: parseFloat(user.staked_balance) - parseFloat(stake.amount) } : {}),
         },
       }),
       prisma.transactions.create({
@@ -256,8 +250,8 @@ export const claimStakeProfit = async (req, res) => {
           user_id: userId,
           type: 'STAKE_PROFIT',
           amount: claimAmount,
-          balance_before: user.balance,
-          balance_after: newBalance,
+          balance_before: user.staked_balance,
+          balance_after: newProfitBalance,
           reference_id: stake.id,
           description: `Claimed compounding profit of $${claimAmount.toFixed(2)} from stake #${stake.id.substring(0, 8)}`,
         },

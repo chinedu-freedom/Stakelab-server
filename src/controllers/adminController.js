@@ -676,10 +676,17 @@ export const updateEmailSettings = async (req, res) => {
 
 export const updateUserBalance = async (req, res) => {
   try {
-    const { user_id, action, wallet_type, amount, remark } = req.body;
+    const { user_id, action, wallet_type, amount, remark, admin_password } = req.body;
+    const adminId = req.admin?.id;
 
     if (!user_id || !action || !amount || parseFloat(amount) <= 0 || !remark) {
       return res.status(400).json({ success: false, message: 'User ID, action (add/subtract), amount, and remark are required' });
+    }
+
+    if (admin_password) {
+      if (String(admin_password).trim() !== adminVerificationPin) {
+        return res.status(400).json({ success: false, message: 'Invalid Admin Security Verification Password' });
+      }
     }
 
     const user = await prisma.users.findUnique({ where: { id: user_id } });
@@ -689,11 +696,11 @@ export const updateUserBalance = async (req, res) => {
 
     const numAmount = parseFloat(amount);
     const targetWallet = wallet_type || 'Main Balance';
-    const isStaked = targetWallet === 'Staked Balance';
-    const currentVal = parseFloat(isStaked ? (user.staked_balance || 0) : (user.balance || 0));
+    const isProfitWallet = targetWallet === 'Profits Wallet' || targetWallet === 'Staked Balance' || targetWallet === 'Wallet Balance';
+    const currentVal = parseFloat(isProfitWallet ? (user.staked_balance || 0) : (user.balance || 0));
     const newVal = action === 'add' ? currentVal + numAmount : Math.max(0, currentVal - numAmount);
 
-    const userUpdateData = isStaked
+    const userUpdateData = isProfitWallet
       ? { staked_balance: newVal }
       : { balance: newVal };
 
@@ -983,14 +990,14 @@ export async function processReferralCommissions({ userId, amount, sourceUser, e
       if (levelPercent > 0) {
         const commissionAmount = (amount * levelPercent) / 100;
         if (commissionAmount > 0) {
-          const inviterNewBalance = parseFloat(inviter.balance) + commissionAmount;
+          const inviterNewProfit = parseFloat(inviter.staked_balance || 0) + commissionAmount;
           const inviterNewEarned = parseFloat(inviter.total_earned || 0) + commissionAmount;
 
           await prisma.$transaction([
             prisma.users.update({
               where: { id: inviter.id },
               data: {
-                balance: inviterNewBalance,
+                staked_balance: inviterNewProfit,
                 total_earned: inviterNewEarned,
               },
             }),
@@ -999,8 +1006,8 @@ export async function processReferralCommissions({ userId, amount, sourceUser, e
                 user_id: inviter.id,
                 type: 'REFERRAL_COMMISSION',
                 amount: commissionAmount,
-                balance_before: inviter.balance,
-                balance_after: inviterNewBalance,
+                balance_before: inviter.staked_balance,
+                balance_after: inviterNewProfit,
                 description: `Level ${levelObj.level || i + 1} ${isStaking ? 'Staking' : 'Deposit'} Referral Commission (${levelPercent}%) from @${sourceUser.username || sourceUser.full_name}'s $${amount} ${isStaking ? 'staking' : 'deposit'}`,
               },
             }),

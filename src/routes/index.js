@@ -138,8 +138,13 @@ router.post('/staking/stake', authenticateUser, createStake);
 router.get('/staking/my-stakes', authenticateUser, getUserStakes);
 router.post('/staking/claim', authenticateUser, claimStakeProfit);
 router.post('/deposits', authenticateUser, createDeposit);
+router.post('/user/deposits', authenticateUser, createDeposit);
 router.get('/deposits', authenticateUser, getUserDeposits);
+router.get('/user/deposits', authenticateUser, getUserDeposits);
+
 router.post('/withdrawals', authenticateUser, createWithdrawal);
+router.post('/user/withdrawals', authenticateUser, createWithdrawal);
+router.get('/withdrawals', authenticateUser, getUserWithdrawals);
 router.get('/user/withdrawals', authenticateUser, getUserWithdrawals);
 router.post('/user/wallets', authenticateUser, addOrUpdateUserWallet);
 router.get('/user/wallets', authenticateUser, getUserWallets);

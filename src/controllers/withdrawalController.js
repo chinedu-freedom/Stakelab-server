@@ -26,7 +26,7 @@ export const createWithdrawal = async (req, res) => {
     }
 
     const selectedWallet = wallet_type === 'profit' ? 'profit' : 'main';
-    const currentBalance = selectedWallet === 'profit' ? parseFloat(user.total_earned || 0) : parseFloat(user.balance || 0);
+    const currentBalance = selectedWallet === 'profit' ? parseFloat(user.staked_balance || 0) : parseFloat(user.balance || 0);
 
     if (currentBalance < withdrawAmount) {
       const walletName = selectedWallet === 'profit' ? 'Profits Wallet' : 'Staking Wallet';
@@ -52,7 +52,7 @@ export const createWithdrawal = async (req, res) => {
     const updatedBalanceValue = currentBalance - withdrawAmount;
 
     const userUpdateData = selectedWallet === 'profit'
-      ? { total_earned: updatedBalanceValue }
+      ? { staked_balance: updatedBalanceValue }
       : { balance: updatedBalanceValue };
 
     const walletLabel = selectedWallet === 'profit' ? 'Profits Wallet' : 'Staking Wallet';
