@@ -48,6 +48,37 @@ export const createStake = async (req, res) => {
       return res.status(400).json({ success: false, message: 'This staking plan is currently unavailable for purchase.' });
     }
 
+    // Prerequisite Check: User must have an investment in Flexible Tier before investing in Dynamic Tier
+    const planTitleUpper = (plan.title || plan.name || '').toUpperCase();
+    const planBadgeUpper = (plan.badge || '').toUpperCase();
+    const isDynamicTier = planTitleUpper.includes('DYNAMIC') || planBadgeUpper.includes('DYNAMIC');
+
+    if (isDynamicTier) {
+      const userStakes = await prisma.user_stakes.findMany({
+        where: { user_id: userId },
+        include: { plan: true },
+      });
+
+      const hasFlexibleStake = userStakes.some((s) => {
+        const pTitle = (s.plan?.title || s.plan?.name || '').toUpperCase();
+        const pBadge = (s.plan?.badge || '').toUpperCase();
+        return (
+          pTitle.includes('FLEXIBLE') ||
+          pBadge.includes('FLEXIBLE') ||
+          pTitle.includes('STANDARD') ||
+          pBadge.includes('STANDARD') ||
+          (!pTitle.includes('DYNAMIC') && !pBadge.includes('DYNAMIC'))
+        );
+      });
+
+      if (!hasFlexibleStake) {
+        return res.status(400).json({
+          success: false,
+          message: 'You must have an investment in the Flexible Tier before investing in the Dynamic Tier.',
+        });
+      }
+    }
+
     if (stakeAmount < parseFloat(plan.min_amount) || stakeAmount > parseFloat(plan.max_amount)) {
       return res.status(400).json({
         success: false,

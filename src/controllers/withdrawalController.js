@@ -18,6 +18,18 @@ export const createWithdrawal = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Amount, method, and wallet address are required' });
     }
 
+    // Require active investment package to process withdrawal
+    const activeStake = await prisma.user_stakes.findFirst({
+      where: { user_id: userId, status: 'ACTIVE' },
+    });
+
+    if (!activeStake) {
+      return res.status(400).json({
+        success: false,
+        message: 'Withdrawal locked! You must have an active investment package to process withdrawals.',
+      });
+    }
+
     const withdrawAmount = parseFloat(amount);
     const user = await prisma.users.findUnique({ where: { id: userId } });
 

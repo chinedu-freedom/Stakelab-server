@@ -26,24 +26,7 @@ let giftCodesStore = [
   },
 ];
 
-let giftCodeClaimsStore = [
-  {
-    id: 'claim-1',
-    code: '9A0DDI5D',
-    user_name: 'John Doe',
-    user_email: 'john@example.com',
-    amount: 8.0,
-    claimed_at: new Date().toISOString(),
-  },
-  {
-    id: 'claim-2',
-    code: '4WWNUF1E',
-    user_name: 'Alice Smith',
-    user_email: 'alice@example.com',
-    amount: 2.0,
-    claimed_at: new Date(Date.now() - 3600000).toISOString(),
-  },
-];
+let giftCodeClaimsStore = [];
 
 let tasksStore = [
   {
@@ -210,11 +193,20 @@ export const getGiftCodeClaims = async (req, res) => {
 };
 
 export const getUserGiftCodeClaims = async (req, res) => {
-  return res.json({ success: true, claims: giftCodeClaimsStore });
+  const userEmail = req.user?.email;
+  const userId = req.user?.id;
+  const userClaims = giftCodeClaimsStore.filter(
+    (c) => (userId && c.user_id === userId) || (userEmail && c.user_email === userEmail)
+  );
+  return res.json({ success: true, claims: userClaims });
 };
 
 export const claimGiftCode = async (req, res) => {
   try {
+    if (!req.user.email_verified) {
+      return res.status(403).json({ success: false, require_email_verification: true, message: 'Please verify your email address first.' });
+    }
+
     const { code } = req.body;
     if (!code) {
       return res.status(400).json({ success: false, message: 'Please enter a gift code.' });
@@ -243,6 +235,7 @@ export const claimGiftCode = async (req, res) => {
     foundCode.used_count += 1;
     const newClaim = {
       id: `claim-${Date.now()}`,
+      user_id: req.user?.id,
       code: foundCode.code,
       user_name: req.user?.full_name || req.user?.email || 'Valued User',
       user_email: req.user?.email || 'user@example.com',
@@ -407,6 +400,9 @@ export const getUserDailyCheckinStatus = async (req, res) => {
 
 export const claimUserDailyCheckin = async (req, res) => {
   try {
+    if (!req.user?.email_verified) {
+      return res.status(403).json({ success: false, require_email_verification: true, message: 'Please verify your email address first.' });
+    }
     const userId = req.user?.id;
     const todayStr = new Date().toISOString().split('T')[0];
     if (userCheckinState.lastClaimDate === todayStr) {
@@ -577,22 +573,7 @@ let systemFeaturesStore = {
 };
 
 let userTasksClaimsStore = [];
-let userRecentSpinWins = [
-  {
-    id: 'win-1',
-    prize: { name: '$2.50' },
-    reward_earned: 2.5,
-    spin_type: 'free',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'win-2',
-    prize: { name: '$0.50' },
-    reward_earned: 0.5,
-    spin_type: 'paid',
-    created_at: new Date(Date.now() - 7200000).toISOString(),
-  },
-];
+let userRecentSpinWins = [];
 export async function grantDepositFreeSpins(userId) {
   try {
     const count = parseInt(spinSettingsStore.free_spins_per_deposit || 1);
@@ -666,6 +647,9 @@ export const getUserTasks = async (req, res) => {
 
 export const claimUserTask = async (req, res) => {
   try {
+    if (!req.user?.email_verified) {
+      return res.status(403).json({ success: false, require_email_verification: true, message: 'Please verify your email address first.' });
+    }
     const { taskId } = req.body;
     const userId = req.user?.id;
     const userEmail = req.user?.email || 'user@example.com';
