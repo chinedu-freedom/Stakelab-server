@@ -39,44 +39,55 @@ export function renderEmailTemplate({ siteName, siteLogo, subject, content, emai
   const codeMatch = typeof content === 'string' ? content.match(/\b\d{4,8}\b/) : null;
   const extractedCode = codeMatch ? codeMatch[0] : null;
 
+  // Header Brand styling with dynamic Logo support
+  const headerBrandHtml = siteLogo
+    ? `<img src="${siteLogo}" alt="${siteName}" style="max-height: 48px; max-width: 220px; object-fit: contain; display: block; margin: 0 auto;" />`
+    : `<h1 style="color:#ffffff; margin:0; font-size:28px; letter-spacing:1px; font-weight: 900; text-transform: uppercase; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">${siteName}</h1>`;
+
   let innerContentHtml = content;
 
   if (typeof content === 'string') {
-    let cleanContent = stripEmojisAndIcons(content);
+    let cleanContent = stripEmojisAndIcons(content).replace(/everstake|stakelab/gi, siteName);
 
     if (extractedCode || emailType === 'PIN_RESET_OTP' || emailType === 'EMAIL_VERIFICATION' || emailType === 'VERIFICATION' || emailType === 'PASSWORD_RESET') {
       const displayCode = extractedCode || '******';
-      const formattedCode = displayCode.split('').join(' ');
 
       innerContentHtml = `
-        <div style="font-size: 16px; color: #ffffff; font-weight: 700; margin-bottom: 16px;">
-          Hi User,
-        </div>
-        <div style="color: #94a3b8; font-size: 14.5px; line-height: 1.6; margin-bottom: 24px;">
-          You recently requested a security verification code for your <b style="color: #ffffff;">${siteName}</b> account. Please use the OTP code below to complete the process:
-        </div>
+        <div style="text-align:center; padding:10px 0;">
+          <h2 style="color:#0f172a; margin-bottom:10px; font-size: 20px; font-weight: 700;">${cleanSubject}</h2>
+          <p style="color:#475569; font-size:15px; line-height:1.6; margin-bottom: 20px;">
+            Please use the confirmation code below to authorize your request:
+          </p>
 
-        <table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center" style="margin: 28px auto; border-collapse: collapse;">
-          <tr>
-            <td align="center" style="background-color: #0d9488; border-radius: 12px; padding: 14px 36px; text-align: center;">
-              <span style="font-family: 'Courier New', Courier, monospace; font-size: 32px; font-weight: 900; letter-spacing: 6px; color: #ffffff !important; text-decoration: none; display: inline-block;">
-                ${formattedCode}
-              </span>
-            </td>
-          </tr>
-        </table>
+          <div style="margin:24px 0; text-align:center;">
+            <span style="
+              background: #fff1f2;
+              color: #ff0044;
+              padding: 14px 28px;
+              font-size: 26px;
+              font-weight: 900;
+              letter-spacing: 6px;
+              border: 2px dashed #ff0044;
+              border-radius: 12px;
+              display: inline-block;
+              white-space: nowrap !important;
+              font-family: 'Courier New', Courier, monospace;
+            ">
+              ${displayCode}
+            </span>
+          </div>
 
-        <div style="color: #94a3b8; font-size: 14px; line-height: 1.6; margin-bottom: 16px;">
-          This OTP is valid for <b style="color: #ffffff;">10 minutes</b>. For your security, do not share this code with anyone.
-        </div>
-
-        <div style="color: #64748b; font-size: 13px; line-height: 1.6;">
-          If you didn't request this code, you can safely ignore this email. Your account will remain secure.
+          <p style="font-size:14px; color:#64748b; margin-top:16px;">
+            This code is valid for <strong>10 minutes</strong>. Never share this code with anyone.
+          </p>
+          <p style="font-size:12px; color:#94a3b8; margin-top:24px;">
+            If you did not make this request, please secure your account immediately or contact support.
+          </p>
         </div>
       `;
     } else {
       innerContentHtml = `
-        <div style="color: #cbd5e1; font-size: 14.5px; line-height: 1.7;">
+        <div style="color: #334155; font-size: 15px; line-height: 1.7;">
           ${cleanContent}
         </div>
       `;
@@ -89,26 +100,26 @@ export function renderEmailTemplate({ siteName, siteLogo, subject, content, emai
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body style="margin:0; padding:0; background-color:#f8f9fa; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
-  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#f8f9fa; padding:40px 0;">
+<body style="margin:0; padding:0; background-color:#ffffff; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#ffffff; width: 100%; border-collapse: collapse;">
      <tr>
       <td align="center">
-        <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,0.04);">
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width:600px; background-color:#ffffff; overflow:hidden;">
           <!-- Header -->
           <tr>
-            <td style="background-color:#ff0044; padding:30px 40px; text-align:center;">
-              <h1 style="color:#ffffff; margin:0; font-size:28px; letter-spacing:1px; font-weight: 900; text-transform: uppercase;">${siteName}</h1>
+            <td style="background-color:#ff0044; padding:30px 20px; text-align:center;">
+              ${headerBrandHtml}
             </td>
           </tr>
           <!-- Body -->
           <tr>
-            <td style="padding:40px;">
+            <td style="padding:32px 24px; background-color:#ffffff;">
               ${innerContentHtml}
             </td>
           </tr>
           <!-- Footer -->
           <tr>
-            <td style="background-color:#f1f5f9; padding:24px 40px; text-align:center;">
+            <td style="background-color:#f8fafc; padding:24px 20px; text-align:center; border-top: 1px solid #f1f5f9;">
               <p style="margin:0; color:#64748b; font-size:13px; line-height:1.6;">
                 &copy; ${new Date().getFullYear()} ${siteName}. All rights reserved.<br>
                 You received this email because you are registered on ${siteName}.
