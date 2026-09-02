@@ -275,14 +275,8 @@ export const approveDeposit = async (req, res) => {
       }),
     ]);
 
-    // Process deposit referral commissions & free spin rewards
+    // Grant deposit free spin reward
     await grantDepositFreeSpins(deposit.user_id);
-    await processReferralCommissions({
-      userId: deposit.user_id,
-      amount: parseFloat(deposit.amount),
-      sourceUser: deposit.user,
-      eventType: 'DEPOSIT',
-    });
 
     sendEmail({
       to: deposit.user.email,
