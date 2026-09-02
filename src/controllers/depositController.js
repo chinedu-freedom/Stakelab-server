@@ -247,7 +247,7 @@ export const oxapayWebhook = async (req, res) => {
             amount: creditAmount,
             balance_before: user.balance,
             balance_after: newBalance,
-            description: `Automated OxaPay Deposit of $${creditAmount} (${deposit.payment_method})`,
+            description: `Automated Deposit of $${creditAmount} (${deposit.payment_method})`,
           },
         });
 

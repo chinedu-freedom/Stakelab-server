@@ -62,12 +62,17 @@ export const getUserDashboardData = async (req, res) => {
       referral_earning: refEarningsAgg._sum.amount || 0,
     };
 
+    const sanitizedRecentTransactions = (recentTransactions || []).map((t) => ({
+      ...t,
+      description: t.description ? t.description.replace(/OxaPay\s*/gi, '').trim() : t.description,
+    }));
+
     return res.json({
       success: true,
       user: fullUser,
       settings: siteSettings,
       activeStakes,
-      recentTransactions,
+      recentTransactions: sanitizedRecentTransactions,
       referralCount,
     });
   } catch (error) {
@@ -116,7 +121,13 @@ export const getUserTransactions = async (req, res) => {
       where: { user_id: req.user.id },
       orderBy: { created_at: 'desc' },
     });
-    return res.json({ success: true, transactions });
+
+    const sanitized = transactions.map((t) => ({
+      ...t,
+      description: t.description ? t.description.replace(/OxaPay\s*/gi, '').trim() : t.description,
+    }));
+
+    return res.json({ success: true, transactions: sanitized });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to fetch transactions', error: error.message });
   }
