@@ -39,11 +39,6 @@ export function renderEmailTemplate({ siteName, siteLogo, subject, content, emai
   const codeMatch = typeof content === 'string' ? content.match(/\b\d{4,8}\b/) : null;
   const extractedCode = codeMatch ? codeMatch[0] : null;
 
-  // Dynamic Header Logo / Site Name
-  const headerBrandHtml = siteLogo
-    ? `<img src="${siteLogo}" alt="${siteName}" style="max-height: 48px; max-width: 240px; object-fit: contain; display: block; margin: 0 auto;" />`
-    : `<h1 style="color:#ffffff; margin:0; font-size:28px; letter-spacing:1px; font-weight: 900; text-transform: uppercase;">${siteName}</h1>`;
-
   let innerContentHtml = content;
 
   if (typeof content === 'string') {
@@ -59,20 +54,19 @@ export function renderEmailTemplate({ siteName, siteLogo, subject, content, emai
             Please use the confirmation code below to authorize your request:
           </p>
 
-          <div style="margin:24px 0; text-align:center;">
+          <div style="margin:24px 0; text-align:center; white-space: nowrap !important;">
             <span style="
               background: #fff1f2;
               color: #ff0044;
-              padding: 12px 24px;
-              font-size: 24px;
-              font-weight: 800;
+              padding: 12px 28px;
+              font-size: 26px;
+              font-weight: 900;
               letter-spacing: 6px;
               border: 2px dashed #ff0044;
               border-radius: 12px;
               display: inline-block;
               white-space: nowrap !important;
               word-break: keep-all !important;
-              max-width: 90%;
             ">
               ${displayCode}
             </span>
@@ -88,7 +82,7 @@ export function renderEmailTemplate({ siteName, siteLogo, subject, content, emai
       `;
     } else {
       innerContentHtml = `
-        <div style="color: #334155; font-size: 15px; line-height: 1.7;">
+        <div style="color: #cbd5e1; font-size: 14.5px; line-height: 1.7;">
           ${cleanContent}
         </div>
       `;
@@ -101,26 +95,26 @@ export function renderEmailTemplate({ siteName, siteLogo, subject, content, emai
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body style="margin:0; padding:0; background-color:#ffffff; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
-  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#ffffff; padding:0; margin:0; width:100%;">
+<body style="margin:0; padding:0; background-color:#f8f9fa; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#f8f9fa; padding:40px 0;">
      <tr>
       <td align="center">
-        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width:600px; background-color:#ffffff; overflow:hidden;">
+        <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,0.04);">
           <!-- Header -->
           <tr>
-            <td style="background-color:#ff0044; padding:30px 20px; text-align:center;">
-              ${headerBrandHtml}
+            <td style="background-color:#ff0044; padding:30px 40px; text-align:center;">
+              <h1 style="color:#ffffff; margin:0; font-size:28px; letter-spacing:1px; font-weight: 900; text-transform: uppercase;">${siteName}</h1>
             </td>
           </tr>
           <!-- Body -->
           <tr>
-            <td style="padding:32px 24px;">
+            <td style="padding:40px;">
               ${innerContentHtml}
             </td>
           </tr>
           <!-- Footer -->
           <tr>
-            <td style="background-color:#f1f5f9; padding:24px 20px; text-align:center;">
+            <td style="background-color:#f1f5f9; padding:24px 40px; text-align:center;">
               <p style="margin:0; color:#64748b; font-size:13px; line-height:1.6;">
                 &copy; ${new Date().getFullYear()} ${siteName}. All rights reserved.<br>
                 You received this email because you are registered on ${siteName}.
