@@ -670,29 +670,49 @@ export const updateSecurityPin = async (req, res) => {
 export const getUserNotifications = async (req, res) => {
   try {
     const userId = req.user.id;
+    const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
 
-    const answeredTickets = await prisma.support_tickets.findMany({
-      where: { user_id: userId, status: { in: ['ANSWERED', 'REPLIED'] } },
-      take: 5,
-      orderBy: { updated_at: 'desc' },
-      select: { id: true, ticket_code: true, subject: true, status: true, updated_at: true },
-    });
+    const [answeredTickets, recentDeposits, recentWithdrawals, recentStakes, recentTransactions] = await Promise.all([
+      prisma.support_tickets.findMany({
+        where: { user_id: userId, status: { in: ['ANSWERED', 'REPLIED', 'OPEN'] } },
+        take: 5,
+        orderBy: { updated_at: 'desc' },
+        select: { id: true, ticket_id: true, subject: true, status: true, updated_at: true },
+      }),
+      prisma.deposits.findMany({
+        where: { user_id: userId },
+        take: 5,
+        orderBy: { created_at: 'desc' },
+        select: { id: true, amount: true, status: true, created_at: true, payment_method: true },
+      }),
+      prisma.withdrawals.findMany({
+        where: { user_id: userId },
+        take: 5,
+        orderBy: { created_at: 'desc' },
+        select: { id: true, amount: true, status: true, created_at: true, withdrawal_method: true },
+      }),
+      prisma.user_stakes.findMany({
+        where: { user_id: userId, created_at: { gte: fortyEightHoursAgo } },
+        take: 5,
+        orderBy: { created_at: 'desc' },
+        include: { plan: { select: { title: true } } },
+      }),
+      prisma.transactions.findMany({
+        where: {
+          user_id: userId,
+          type: { in: ['ADMIN_ADDITION', 'ADMIN_DEDUCTION', 'GIFT_BONUS', 'REFERRAL_COMMISSION', 'STAKE_PROFIT'] },
+          created_at: { gte: fortyEightHoursAgo },
+        },
+        take: 5,
+        orderBy: { created_at: 'desc' },
+      }),
+    ]);
 
-    const recentDeposits = await prisma.deposits.findMany({
-      where: { user_id: userId },
-      take: 5,
-      orderBy: { created_at: 'desc' },
-      select: { id: true, amount: true, status: true, created_at: true },
-    });
-
-    const recentWithdrawals = await prisma.withdrawals.findMany({
-      where: { user_id: userId },
-      take: 5,
-      orderBy: { created_at: 'desc' },
-      select: { id: true, amount: true, status: true, created_at: true },
-    });
-
-    const unreadCount = answeredTickets.length + recentDeposits.filter((d) => d.status === 'APPROVED').length;
+    const unreadCount =
+      answeredTickets.filter((t) => t.status === 'REPLIED' || t.status === 'ANSWERED').length +
+      recentDeposits.filter((d) => d.status === 'APPROVED').length +
+      recentWithdrawals.filter((w) => w.status === 'APPROVED').length +
+      recentTransactions.length;
 
     return res.json({
       success: true,
@@ -700,6 +720,8 @@ export const getUserNotifications = async (req, res) => {
       tickets: answeredTickets,
       deposits: recentDeposits,
       withdrawals: recentWithdrawals,
+      stakes: recentStakes,
+      transactions: recentTransactions,
     });
   } catch (err) {
     console.error('Error fetching user notifications:', err);

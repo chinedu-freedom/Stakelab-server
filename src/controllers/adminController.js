@@ -733,29 +733,53 @@ export const updateUserBalance = async (req, res) => {
 
 export const sendBatchNotification = async (req, res) => {
   try {
-    const { subject, message, target_users } = req.body;
+    const { subject, message, target_users, start_from, per_batch, cooling_period } = req.body;
     if (!subject || !message) {
       return res.status(400).json({ success: false, message: 'Subject and message are required' });
     }
+
+    const startFrom = Math.max(1, parseInt(start_from || '1'));
+    const batchSize = Math.max(1, parseInt(per_batch || '100'));
+    const delaySeconds = Math.max(0, parseInt(cooling_period || '2'));
 
     const where = {};
     if (target_users === 'Active Users') where.is_active = true;
     if (target_users === 'Banned Users') where.is_active = false;
     if (target_users === 'Email Unverified') where.email_verified = false;
 
-    const targetList = await prisma.users.findMany({ where, select: { email: true, full_name: true } });
-
-    targetList.forEach((u) => {
-      sendEmail({
-        to: u.email,
-        subject: subject,
-        html: `<h2>${subject}</h2><p>Dear ${u.full_name},</p><p>${message}</p>`,
-      }).catch(() => null);
+    const allUsers = await prisma.users.findMany({
+      where,
+      orderBy: { created_at: 'asc' },
+      select: { id: true, email: true, full_name: true },
     });
+
+    const targetList = allUsers.slice(startFrom - 1);
+
+    // Asynchronous Background Batch Dispatcher with Cooling Period Delay
+    (async () => {
+      for (let i = 0; i < targetList.length; i += batchSize) {
+        const currentBatch = targetList.slice(i, i + batchSize);
+
+        await Promise.all(
+          currentBatch.map((u) =>
+            sendEmail({
+              to: u.email,
+              subject: subject,
+              html: `<h2>${subject}</h2><p>Dear ${u.full_name},</p><div>${message}</div>`,
+              emailType: 'BROADCAST',
+            }).catch(() => null)
+          )
+        );
+
+        if (i + batchSize < targetList.length && delaySeconds > 0) {
+          await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+        }
+      }
+    })().catch((err) => console.error('Batch notification processing error:', err));
 
     return res.json({
       success: true,
-      message: `Batch notification queued successfully for ${targetList.length} users via EMAIL!`,
+      message: `Batch notification successfully queued! Processing ${targetList.length} users starting from position #${startFrom} in batches of ${batchSize} with a ${delaySeconds}s cooling period.`,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to send batch notification', error: error.message });
