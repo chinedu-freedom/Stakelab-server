@@ -54,24 +54,28 @@ export const register = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email, password, and full name are required' });
     }
 
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanUsername = username ? username.trim().toLowerCase() : '';
+    const cleanMobile = mobile ? mobile.trim() : '';
+
     const existingUser = await prisma.users.findFirst({
       where: {
         OR: [
-          { email },
-          ...(username ? [{ username }] : []),
-          ...(mobile ? [{ mobile }] : []),
+          { email: { equals: cleanEmail, mode: 'insensitive' } },
+          ...(cleanUsername ? [{ username: { equals: cleanUsername, mode: 'insensitive' } }] : []),
+          ...(cleanMobile ? [{ mobile: cleanMobile }] : []),
         ],
       },
     });
 
     if (existingUser) {
-      if (existingUser.email.toLowerCase() === email.toLowerCase()) {
+      if (existingUser.email.toLowerCase() === cleanEmail) {
         return res.status(400).json({ success: false, message: 'A user with this email address already exists' });
       }
-      if (username && existingUser.username && existingUser.username.toLowerCase() === username.toLowerCase()) {
+      if (cleanUsername && existingUser.username && existingUser.username.toLowerCase() === cleanUsername) {
         return res.status(400).json({ success: false, message: 'This username is already taken' });
       }
-      if (mobile && existingUser.mobile && existingUser.mobile === mobile) {
+      if (cleanMobile && existingUser.mobile && existingUser.mobile === cleanMobile) {
         return res.status(400).json({ success: false, message: 'A user with this phone number already exists' });
       }
       return res.status(400).json({ success: false, message: 'A user with this email, username, or phone number already exists' });
@@ -93,7 +97,7 @@ export const register = async (req, res) => {
     const password_hash = await bcrypt.hash(password, 10);
     const newRefCode = 'STK' + Math.random().toString(36).substring(2, 8).toUpperCase();
 
-    const isProfileComplete = Boolean(country && mobile);
+    const isProfileComplete = Boolean(country && cleanMobile);
 
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -101,12 +105,12 @@ export const register = async (req, res) => {
 
     const user = await prisma.users.create({
       data: {
-        email,
+        email: cleanEmail,
         password_hash,
         full_name,
-        username: username || email.split('@')[0],
+        username: username ? username.trim() : cleanEmail.split('@')[0],
         country: country || null,
-        mobile: mobile || null,
+        mobile: cleanMobile || null,
         address: address || null,
         state: state || null,
         zip_code: zip_code || null,
@@ -137,32 +141,30 @@ export const register = async (req, res) => {
       }).catch(() => null);
     }
 
-    // Send verification email
-    sendEmail({
-      to: user.email,
-      subject: 'Verify Your Email Address - EverStake',
-      html: `<h2>Welcome ${user.full_name}!</h2><p>Thank you for registering on EverStake. Your 6-digit email verification code is: <b style="font-size: 24px; color: #ff0044;">${verificationCode}</b></p><p>Enter this code on the platform to activate full features including deposits and withdrawals.</p>`,
-      emailType: 'VERIFICATION',
-      userId: user.id,
-    });
-
-    // Notify Admin of new registration
     sendAdminNotificationEmail({
-      subject: `New User Sign Up: @${user.username || user.full_name}`,
-      title: 'New Account Registration',
-      details: `<p>A new user registered on EverStake:</p><ul><li><b>Name:</b> ${user.full_name}</li><li><b>Username:</b> @${user.username}</li><li><b>Email:</b> ${user.email}</li><li><b>Country:</b> ${user.country || 'N/A'}</li></ul>`,
+      subject: `New User Registration: @${user.username || user.full_name}`,
+      title: 'New Account Created',
+      details: `<p>A new user registered on EverStake:</p><ul><li><b>Full Name:</b> ${user.full_name}</li><li><b>Email:</b> ${user.email}</li><li><b>Username:</b> @${user.username}</li><li><b>Referred By:</b> ${referrerId ? 'Yes' : 'Direct Registration'}</li></ul>`,
     }).catch(() => null);
 
-    const isRemember = Boolean(req.body.remember_me || req.body.rememberMe || req.body.remember);
+    // Send verification code OTP email
+    sendEmail({
+      to: user.email,
+      subject: 'Verify Your Email Address',
+      html: `<h2>Email Verification Required</h2><p>Your 6-digit verification PIN is: <b style="font-size: 24px; color: #ff0044;">${verificationCode}</b></p><p>This code expires in 24 hours.</p>`,
+      emailType: 'EMAIL_VERIFICATION',
+      userId: user.id,
+    }).catch((err) => console.error('Verification email error:', err));
+
     const token = jwt.sign(
       { userId: user.id, email: user.email },
       process.env.JWT_SECRET || 'stakelab_super_secret_jwt_key_2026_change_in_production',
-      { expiresIn: isRemember ? '1d' : '1h' }
+      { expiresIn: '1d' }
     );
 
     return res.status(201).json({
       success: true,
-      message: 'Registration successful. Verification email sent.',
+      message: 'Registration successful. Please verify your email address.',
       token,
       user: {
         id: user.id,
@@ -173,13 +175,6 @@ export const register = async (req, res) => {
         staked_balance: user.staked_balance,
         total_earned: user.total_earned,
         referral_code: user.referral_code,
-        mobile: user.mobile,
-        country: user.country,
-        address: user.address,
-        state: user.state,
-        zip_code: user.zip_code,
-        city: user.city,
-        profile_complete: user.profile_complete,
         email_verified: false,
       },
     });
@@ -203,7 +198,12 @@ export const login = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email and password are required' });
     }
 
-    const user = await prisma.users.findUnique({ where: { email } });
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await prisma.users.findFirst({
+      where: {
+        email: { equals: cleanEmail, mode: 'insensitive' },
+      },
+    });
 
     if (!user || !(await bcrypt.compare(password, user.password_hash))) {
       return res.status(400).json({ success: false, message: 'Invalid email or password' });
