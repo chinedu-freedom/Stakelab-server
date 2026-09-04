@@ -1,6 +1,5 @@
 import { prisma } from '../config/db.js';
 import { sendEmail } from '../services/emailService.js';
-import { grantDepositFreeSpins } from './rewardController.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 
@@ -275,8 +274,7 @@ export const approveDeposit = async (req, res) => {
       }),
     ]);
 
-    // Grant deposit free spin reward
-    await grantDepositFreeSpins(deposit.user_id);
+
 
     sendEmail({
       to: deposit.user.email,
@@ -1030,32 +1028,6 @@ export async function processReferralCommissions({ userId, amount, sourceUser, e
               },
             }),
           ]);
-        }
-      }
-
-      // Direct inviter free spin reward on first stake
-      if (i === 0 && isStaking) {
-        try {
-          await prisma.transactions.create({
-            data: {
-              user_id: inviter.id,
-              type: 'FREE_SPIN_REWARD',
-              amount: 1,
-              balance_before: inviter.balance,
-              balance_after: inviter.balance,
-              description: `Earned +1 Lucky Free Spin because @${sourceUser.username || sourceUser.full_name} deposited & invested $${amount}`,
-            },
-          });
-
-          sendEmail({
-            to: inviter.email,
-            subject: '🎁 You Earned 1 Lucky Free Spin! - EverStake',
-            html: `<h2>Congratulations ${inviter.full_name}!</h2><p>Your invited referral <b>@${sourceUser.username || sourceUser.full_name}</b> has completed a deposit and invested $${amount}.</p><p>You have earned <b>+1 Lucky Free Spin</b> to win crypto prizes on EverStake!</p>`,
-            emailType: 'FREE_SPIN_REWARD',
-            userId: inviter.id,
-          });
-        } catch (err) {
-          console.error('Failed to reward free spin to referrer:', err);
         }
       }
 

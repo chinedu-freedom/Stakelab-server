@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../config/db.js';
-import { sendEmail, sendAdminNotificationEmail } from '../services/emailService.js';
+import { sendEmail, sendAdminNotificationEmail, sendFreeSpinRewardEmail } from '../services/emailService.js';
 import { inMemoryGeneralSettings } from './adminController.js';
 
 const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY || '6LffwZUtAAAAALsM0OkIFctHSBITmbn7AZLg3caC';
@@ -139,6 +139,38 @@ export const register = async (req, res) => {
           description: `Welcome Sign Up Bonus of ${bonus.toFixed(2)} USDT credited to account.`,
         },
       }).catch(() => null);
+    }
+
+    if (referrerId) {
+      try {
+        const referrer = await prisma.users.findUnique({ where: { id: referrerId } });
+        if (referrer) {
+          // 1. Award +1 free spin to referrer
+          await prisma.users.update({
+            where: { id: referrer.id },
+            data: { free_spins: { increment: 1 } },
+          });
+
+          const refereeHandle = user.username || user.full_name || user.email.split('@')[0];
+
+          // 2. Log transaction
+          await prisma.transactions.create({
+            data: {
+              user_id: referrer.id,
+              type: 'FREE_SPIN_REWARD',
+              amount: 1,
+              balance_before: referrer.balance,
+              balance_after: referrer.balance,
+              description: `Earned +1 Lucky Free Spin for successfully inviting @${refereeHandle}!`,
+            },
+          }).catch(() => null);
+
+          // 3. Send Free Spin Reward Email to inviter
+          sendFreeSpinRewardEmail({ inviter: referrer, refereeUser: user }).catch(() => null);
+        }
+      } catch (err) {
+        console.error('Failed to reward free spin on referral registration:', err);
+      }
     }
 
     sendAdminNotificationEmail({

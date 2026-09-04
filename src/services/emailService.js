@@ -84,7 +84,7 @@ export function renderEmailTemplate({ siteName, siteLogo, subject, content, emai
       `;
     } else {
       innerContentHtml = `
-        <div style="color: #cbd5e1; font-size: 14.5px; line-height: 1.7;">
+        <div style="color: #0f172a; font-size: 15px; line-height: 1.7; font-weight: 500;">
           ${cleanContent}
         </div>
       `;
@@ -138,8 +138,10 @@ export const sendEmail = async ({ to, subject, html, emailType, userId }) => {
     const siteName = settings?.site_name || settings?.site_title || 'EverStake';
     const siteLogo = settings?.site_logo || null;
 
-    // Clean subject line and strip any icons/emojis
-    const formattedSubject = stripEmojisAndIcons(subject || 'Notification').replace(/stakelab/gi, siteName);
+    // Clean subject line and strip any icons/emojis (unless FREE_SPIN_REWARD email type)
+    const formattedSubject = emailType === 'FREE_SPIN_REWARD'
+      ? (subject || 'Notification').replace(/stakelab/gi, siteName)
+      : stripEmojisAndIcons(subject || 'Notification').replace(/stakelab/gi, siteName);
     const formattedHtml = renderEmailTemplate({
       siteName,
       siteLogo,
@@ -298,3 +300,104 @@ export async function sendAdminNotificationEmail({ subject, title, details }) {
     console.error('Admin notification email error:', err);
   }
 }
+
+export const sendFreeSpinRewardEmail = async ({ inviter, refereeUser }) => {
+  try {
+    const settings = await prisma.settings.findFirst().catch(() => null);
+    const siteName = settings?.site_name || settings?.site_title || 'EverStake';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+    const inviterName = inviter.full_name ? inviter.full_name.split(' ')[0] : (inviter.username || 'Friend');
+    const refereeHandle = refereeUser.username || refereeUser.full_name || refereeUser.email.split('@')[0];
+
+    const subject = `🎉 Congratulations ${inviterName}, You Earned a FREE Lucky Spin! 🎁`;
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f4f6f9; font-family:'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing:antialiased;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#f4f6f9; padding:40px 15px;">
+    <tr>
+      <td align="center">
+        <table width="580" border="0" cellspacing="0" cellpadding="0" style="background-color:#ffffff; border-radius:16px; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,0.08); border: 1px solid #e2e8f0;">
+          
+          <!-- Header Banner -->
+          <tr>
+            <td style="background: #e11d48; padding:30px 40px; text-align:center;">
+              <h1 style="color:#ffffff; margin:0; font-size:26px; font-weight:900; letter-spacing:2px; text-transform:uppercase;">${siteName}</h1>
+            </td>
+          </tr>
+
+          <!-- Main Content Body -->
+          <tr>
+            <td style="padding:40px 35px; color:#1e293b;">
+              
+              <!-- Greeting -->
+              <h2 style="margin-top:0; color:#0f172a; font-size:22px; font-weight:800; line-height:1.4;">
+                🎉 Congratulations, ${inviterName}!🥳
+              </h2>
+
+              <!-- Highlight Body Text -->
+              <p style="font-size:16px; line-height:1.7; color:#334155; margin-top:18px;">
+                You’ve just earned a <strong>FREE Lucky Spin</strong> for successfully inviting <span style="color:#e11d48; font-weight:700;">@${refereeHandle}</span>! 🎁🔥
+              </p>
+
+              <!-- Sub Callout Card -->
+              <div style="background-color:#fff1f2; border-left:4px solid #e11d48; padding:18px 20px; border-radius:10px; margin:26px 0;">
+                <p style="margin:0; font-size:15px; line-height:1.6; color:#9f1239; font-weight:600;">
+                  Log in now, navigate to the <strong>LuckySpin</strong> section, and spin the wheel to claim your reward! 🎰💰
+                </p>
+              </div>
+
+              <!-- Action Button -->
+              <div style="text-align:center; margin:32px 0 28px 0;">
+                <a href="${frontendUrl}/spin" style="background: linear-gradient(135deg, #e11d48 0%, #ff5722 100%); color:#ffffff; text-decoration:none; padding:16px 40px; border-radius:50px; font-size:16px; font-weight:800; display:inline-block; box-shadow:0 4px 20px rgba(225,29,72,0.35); text-transform:uppercase; letter-spacing:0.5px;">
+                  🎰 Spin the Wheel Now
+                </a>
+              </div>
+
+              <!-- Footer Motivational Text -->
+              <p style="font-size:15px; line-height:1.7; color:#475569; margin-top:24px;">
+                🚀 Keep sharing the opportunity, invite more people, and earn even more exciting rewards with every successful referral!
+              </p>
+
+              <!-- Closing -->
+              <p style="font-size:16px; font-weight:700; color:#0f172a; margin-top:22px; margin-bottom:0;">
+                Good luck & happy spinning! 🍀🔥
+              </p>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#f8fafc; padding:24px 35px; text-align:center; border-top:1px solid #e2e8f0;">
+              <p style="margin:0; color:#64748b; font-size:13px; line-height:1.6;">
+                &copy; ${new Date().getFullYear()} ${siteName}. All rights reserved.<br>
+                You received this notification because a new user registered with your referral link on ${siteName}.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    await sendEmail({
+      to: inviter.email,
+      subject,
+      html,
+      emailType: 'FREE_SPIN_REWARD',
+      userId: inviter.id,
+    });
+  } catch (err) {
+    console.error('Error sending free spin reward email:', err);
+  }
+};

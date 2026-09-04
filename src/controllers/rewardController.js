@@ -115,25 +115,20 @@ let dailyCheckinsStore = [
 
 let spinSettingsStore = {
   feature_enabled: true,
-  cost_per_spin: 5,
-  free_spins_per_deposit: 1,
-  daily_referral_target: 2,
-  spins_for_daily_challenge: 1,
-  free_spins_daily: 1,
   total_spins_used: 0,
   total_rewards_earned: 0,
   free_spins_used: 0,
 };
 
 let spinPrizesStore = [
-  { id: 'prize-1', position: 1, label: '$0.50', prize_type: 'CASH', amount: 0.5, probability: 20, color: '#3b82f6' },
-  { id: 'prize-2', position: 2, label: '$2.50', prize_type: 'CASH', amount: 2.5, probability: 15, color: '#10b981' },
-  { id: 'prize-3', position: 3, label: '$0.20', prize_type: 'CASH', amount: 0.2, probability: 25, color: '#64748b' },
-  { id: 'prize-4', position: 4, label: '$10.50', prize_type: 'CASH', amount: 10.5, probability: 10, color: '#8b5cf6' },
-  { id: 'prize-5', position: 5, label: '$0.77', prize_type: 'CASH', amount: 0.77, probability: 15, color: '#ff0044' },
-  { id: 'prize-6', position: 6, label: '$15.15', prize_type: 'CASH', amount: 15.15, probability: 8, color: '#f59e0b' },
-  { id: 'prize-7', position: 7, label: '$1.25', prize_type: 'CASH', amount: 1.25, probability: 5, color: '#ec4899' },
-  { id: 'prize-8', position: 8, label: '$20.20', prize_type: 'CASH', amount: 20.2, probability: 2, color: '#fe780b' },
+  { id: 'prize-1', position: 1, label: '$0.50', prize_type: 'CASH', amount: 0.5, probability: 25, color: '#3b82f6' },
+  { id: 'prize-2', position: 2, label: '$2.50', prize_type: 'CASH', amount: 2.5, probability: 7, color: '#10b981' },
+  { id: 'prize-3', position: 3, label: '$0.20', prize_type: 'CASH', amount: 0.2, probability: 35, color: '#64748b' },
+  { id: 'prize-4', position: 4, label: '$10.50', prize_type: 'CASH', amount: 10.5, probability: 3.5, color: '#8b5cf6' },
+  { id: 'prize-5', position: 5, label: '$0.77', prize_type: 'CASH', amount: 0.77, probability: 18, color: '#ff0044' },
+  { id: 'prize-6', position: 6, label: '$15.15', prize_type: 'CASH', amount: 15.15, probability: 1.2, color: '#f59e0b' },
+  { id: 'prize-7', position: 7, label: '$1.25', prize_type: 'CASH', amount: 1.25, probability: 10, color: '#ec4899' },
+  { id: 'prize-8', position: 8, label: '$20.20', prize_type: 'CASH', amount: 20.2, probability: 0.3, color: '#fe780b' },
 ];
 
 // --- Gift Codes Controllers ---
@@ -574,23 +569,6 @@ let systemFeaturesStore = {
 
 let userTasksClaimsStore = [];
 let userRecentSpinWins = [];
-export async function grantDepositFreeSpins(userId) {
-  try {
-    const count = parseInt(spinSettingsStore.free_spins_per_deposit || 1);
-    if (count > 0 && userId) {
-      const user = await prisma.users.findUnique({ where: { id: userId } });
-      if (user) {
-        const newSpins = (user.free_spins || 0) + count;
-        await prisma.users.update({
-          where: { id: userId },
-          data: { free_spins: newSpins },
-        });
-      }
-    }
-  } catch (err) {
-    console.error('Error granting deposit free spins:', err);
-  }
-}
 
 export const getSystemFeatures = async (req, res) => {
   return res.json({ success: true, features: systemFeaturesStore });
@@ -714,6 +692,7 @@ export const getUserSpinInfo = async (req, res) => {
   const userId = req.user?.id;
   let userFreeSpins = 0;
   let recentWins = [];
+  let earnedSpinsHistory = [];
 
   if (userId) {
     try {
@@ -721,29 +700,45 @@ export const getUserSpinInfo = async (req, res) => {
       if (dbUser) {
         userFreeSpins = dbUser.free_spins || 0;
       }
-      const wins = await prisma.transactions.findMany({
-        where: { user_id: userId, type: 'SPIN_WIN' },
-        take: 10,
-        orderBy: { created_at: 'desc' },
-      });
+
+      const [wins, earned] = await Promise.all([
+        prisma.transactions.findMany({
+          where: { user_id: userId, type: 'SPIN_WIN' },
+          take: 10,
+          orderBy: { created_at: 'desc' },
+        }),
+        prisma.transactions.findMany({
+          where: { user_id: userId, type: 'FREE_SPIN_REWARD' },
+          take: 15,
+          orderBy: { created_at: 'desc' },
+        }),
+      ]);
+
       recentWins = wins.map((w) => ({
         id: w.id,
         prize: { name: w.description.replace('Won ', '').replace(' on Lucky Spin Wheel', '') },
         reward_earned: parseFloat(w.amount || 0),
-        spin_type: 'spin',
         created_at: w.created_at,
+      }));
+
+      earnedSpinsHistory = earned.map((s) => ({
+        id: s.id,
+        description: s.description || 'Earned +1 Lucky Free Spin',
+        amount: 1,
+        created_at: s.created_at,
       }));
     } catch (e) {
       recentWins = [];
+      earnedSpinsHistory = [];
     }
   }
 
   return res.json({
     success: true,
     freeSpins: userFreeSpins,
-    costPerSpin: parseFloat(spinSettingsStore.cost_per_spin || 5),
     prizes: spinPrizesStore,
     recentWins,
+    earnedSpinsHistory,
   });
 };
 
@@ -764,24 +759,28 @@ export const spinUserWheel = async (req, res) => {
     }
 
     const currentFreeSpins = dbUser.free_spins || 0;
-    const costPerSpin = parseFloat(spinSettingsStore.cost_per_spin || 5);
-    let isFree = false;
-    let newFreeSpins = currentFreeSpins;
-
-    if (currentFreeSpins > 0) {
-      newFreeSpins = currentFreeSpins - 1;
-      isFree = true;
-    } else {
-      const currentBalance = parseFloat(dbUser.balance || 0);
-      if (currentBalance < costPerSpin) {
-        return res.status(400).json({
-          success: false,
-          message: `Insufficient balance to spin wheel. Each spin costs $${costPerSpin.toFixed(2)}.`,
-        });
-      }
+    if (currentFreeSpins <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'You have 0 free spins left. Earn free spins by inviting friends to register on the platform!',
+      });
     }
 
-    const randomIndex = Math.floor(Math.random() * spinPrizesStore.length);
+    const newFreeSpins = currentFreeSpins - 1;
+
+    // Weighted random selection based on slice probability (higher reward = lower winning probability)
+    const totalWeight = spinPrizesStore.reduce((acc, p) => acc + (parseFloat(p.probability) || 1), 0);
+    let randomWeight = Math.random() * totalWeight;
+    let randomIndex = 0;
+    for (let i = 0; i < spinPrizesStore.length; i++) {
+      const prob = parseFloat(spinPrizesStore[i].probability) || 1;
+      if (randomWeight < prob) {
+        randomIndex = i;
+        break;
+      }
+      randomWeight -= prob;
+    }
+
     const winningPrize = spinPrizesStore[randomIndex] || spinPrizesStore[0];
     const isWin = winningPrize.amount > 0;
     const winAmount = parseFloat(winningPrize.amount || 0);
@@ -791,28 +790,12 @@ export const spinUserWheel = async (req, res) => {
     let newBal = oldBal;
     let newEarned = oldEarned;
 
-    if (!isFree) newBal -= costPerSpin;
     if (isWin) {
       newBal += winAmount;
       newEarned += winAmount;
     }
 
     const txns = [];
-    if (!isFree) {
-      txns.push(
-        prisma.transactions.create({
-          data: {
-            user_id: userId,
-            type: 'SPIN_FEE',
-            amount: costPerSpin,
-            balance_before: oldBal,
-            balance_after: newBal,
-            description: 'Paid Lucky Spin Wheel Entry',
-            created_at: new Date(),
-          },
-        })
-      );
-    }
     if (isWin) {
       txns.push(
         prisma.transactions.create({
@@ -820,9 +803,9 @@ export const spinUserWheel = async (req, res) => {
             user_id: userId,
             type: 'SPIN_WIN',
             amount: winAmount,
-            balance_before: oldEarned,
-            balance_after: newEarned,
-            description: `Won ${winningPrize.label} on Lucky Spin Wheel ${isFree ? '(Free Spin)' : ''}`,
+            balance_before: oldBal,
+            balance_after: newBal,
+            description: `Won ${winningPrize.label} on Lucky Spin Wheel`,
             created_at: new Date(),
           },
         })
@@ -842,9 +825,7 @@ export const spinUserWheel = async (req, res) => {
     ]);
 
     spinSettingsStore.total_spins_used += 1;
-    if (isFree) {
-      spinSettingsStore.free_spins_used += 1;
-    }
+    spinSettingsStore.free_spins_used += 1;
     if (isWin) {
       spinSettingsStore.total_rewards_earned += winAmount;
     }

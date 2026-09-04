@@ -136,7 +136,10 @@ export const updateUserData = async (req, res) => {
 export const getUserTransactions = async (req, res) => {
   try {
     const transactions = await prisma.transactions.findMany({
-      where: { user_id: req.user.id },
+      where: {
+        user_id: req.user.id,
+        type: { not: 'FREE_SPIN_REWARD' },
+      },
       orderBy: { created_at: 'desc' },
     });
 
