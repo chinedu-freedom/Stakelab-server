@@ -461,9 +461,26 @@ export const changePassword = async (req, res) => {
 export const resendEmailVerification = async (req, res) => {
   try {
     const userId = req.user.id;
+    const { force } = req.body || {};
     const dbUser = await prisma.users.findUnique({ where: { id: userId } });
     if (!dbUser) return res.status(404).json({ success: false, message: 'User not found' });
     if (dbUser.email_verified) return res.json({ success: true, message: 'Email is already verified' });
+
+    // Check if an existing verification code is active and not expired
+    const now = new Date();
+    const isCodeActive = Boolean(
+      dbUser.email_verify_code &&
+      dbUser.email_verify_expires &&
+      new Date(dbUser.email_verify_expires) > now
+    );
+
+    if (!force && isCodeActive) {
+      return res.json({
+        success: true,
+        code_already_active: true,
+        message: 'A verification code was sent to your email address and is still valid. Please check your inbox or spam folder.',
+      });
+    }
 
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     await prisma.users.update({
