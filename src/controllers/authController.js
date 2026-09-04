@@ -118,7 +118,7 @@ export const register = async (req, res) => {
         profile_complete: isProfileComplete,
         email_verified: false,
         email_verify_code: verificationCode,
-        email_verify_expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        email_verify_expires: new Date(Date.now() + 10 * 60 * 1000),
         withdrawal_pin: withdrawal_pin || null,
         referral_code: newRefCode,
         referred_by: referrerId,
@@ -151,7 +151,7 @@ export const register = async (req, res) => {
     sendEmail({
       to: user.email,
       subject: 'Verify Your Email Address',
-      html: `<h2>Email Verification Required</h2><p>Your 6-digit verification PIN is: <b style="font-size: 24px; color: #ff0044;">${verificationCode}</b></p><p>This code expires in 24 hours.</p>`,
+      html: `<h2>Email Verification Required</h2><p>Your 6-digit verification PIN is: <b style="font-size: 24px; color: #ff0044;">${verificationCode}</b></p><p>This code expires in 10 minutes.</p>`,
       emailType: 'EMAIL_VERIFICATION',
       userId: user.id,
     }).catch((err) => console.error('Verification email error:', err));
@@ -487,7 +487,7 @@ export const resendEmailVerification = async (req, res) => {
       where: { id: userId },
       data: {
         email_verify_code: verificationCode,
-        email_verify_expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        email_verify_expires: new Date(Date.now() + 10 * 60 * 1000),
       },
     });
 
