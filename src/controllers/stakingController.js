@@ -175,69 +175,92 @@ export const getUserStakes = async (req, res) => {
       orderBy: { created_at: 'desc' },
     });
 
-    let totalNewProfitToCredit = 0;
     const now = new Date();
 
     for (const s of stakes) {
       if (s.status === 'ACTIVE' && s.plan) {
-        const lastClaim = s.last_claim_date || s.start_date || s.created_at;
-        const elapsedHours = (now - new Date(lastClaim)) / (1000 * 60 * 60);
+        const isCompleted = s.end_date && now >= new Date(s.end_date);
 
-        if (elapsedHours >= 24) {
-          const daysToCredit = Math.floor(elapsedHours / 24);
-          const baseAmount = parseFloat(s.amount) + parseFloat(s.total_earned || 0);
-          const dailyPercent = parseFloat(s.plan.daily_return_percent || 0);
+        if (isCompleted) {
+          const amount = parseFloat(s.amount || 0);
+          const dailyReturnPercent = parseFloat(s.plan.daily_return_percent || 0);
+          const durationDays = s.plan.duration_days || 1;
+          const isCompounding = s.plan.is_compounding !== false;
+          const capitalReturn = s.plan.capital_return !== false;
 
-          let profitAdded = 0;
-          let currentBase = baseAmount;
-          for (let d = 0; d < daysToCredit; d++) {
-            const dayProfit = (currentBase * dailyPercent) / 100;
-            profitAdded += dayProfit;
-            currentBase += dayProfit;
+          let expectedTotalReturn = amount;
+          if (isCompounding) {
+            expectedTotalReturn = amount * Math.pow(1 + dailyReturnPercent / 100, durationDays);
+          } else {
+            expectedTotalReturn = amount + (amount * (dailyReturnPercent / 100) * durationDays);
           }
 
-          totalNewProfitToCredit += profitAdded;
+          const totalProfitEarned = Math.max(0, expectedTotalReturn - amount);
 
-          const nextClaimDate = new Date(new Date(lastClaim).getTime() + daysToCredit * 24 * 60 * 60 * 1000);
-          const isCompleted = s.end_date && now >= new Date(s.end_date);
-
+          // Update stake status to COMPLETED and set total_earned
           await prisma.user_stakes.update({
             where: { id: s.id },
             data: {
-              total_earned: parseFloat(s.total_earned || 0) + profitAdded,
-              last_claim_date: nextClaimDate,
-              status: isCompleted ? 'COMPLETED' : 'ACTIVE',
+              total_earned: totalProfitEarned,
+              status: 'COMPLETED',
             },
           }).catch(() => null);
 
-          await prisma.transactions.create({
-            data: {
-              user_id: userId,
-              type: 'STAKE_PROFIT',
-              amount: profitAdded,
-              balance_before: 0,
-              balance_after: profitAdded,
-              reference_id: s.id,
-              description: `Auto-credited daily yield of $${profitAdded.toFixed(2)} from ${s.plan.title || 'Staking Plan'}`,
-            },
-          }).catch(() => null);
+          // Credit profit to Profits Wallet and return capital to Staking Wallet upon maturity
+          const dbUser = await prisma.users.findUnique({ where: { id: userId } });
+          if (dbUser) {
+            const currentStaked = parseFloat(dbUser.staked_balance || 0);
+            const currentBalance = parseFloat(dbUser.balance || 0);
+            const currentTotalEarned = parseFloat(dbUser.total_earned || 0);
+
+            const newStakedBalance = currentStaked + totalProfitEarned;
+            const newTotalEarned = currentTotalEarned + totalProfitEarned;
+            const newMainBalance = capitalReturn ? currentBalance + amount : currentBalance;
+
+            await prisma.users.update({
+              where: { id: userId },
+              data: {
+                balance: newMainBalance,
+                staked_balance: newStakedBalance,
+                total_earned: newTotalEarned,
+              },
+            }).catch(() => null);
+
+            // Transaction log for Profit Maturity Payout
+            if (totalProfitEarned > 0) {
+              await prisma.transactions.create({
+                data: {
+                  user_id: userId,
+                  type: 'STAKE_PROFIT',
+                  amount: totalProfitEarned,
+                  balance_before: currentStaked,
+                  balance_after: newStakedBalance,
+                  reference_id: s.id,
+                  description: `Maturity Payout: $${totalProfitEarned.toFixed(2)} total profit earned from completed ${s.plan.title || 'Staking Plan'}`,
+                },
+              }).catch(() => null);
+            }
+
+            // Transaction log for Capital Return (if enabled)
+            if (capitalReturn) {
+              await prisma.transactions.create({
+                data: {
+                  user_id: userId,
+                  type: 'CAPITAL_RETURN',
+                  amount: amount,
+                  balance_before: currentBalance,
+                  balance_after: newMainBalance,
+                  reference_id: s.id,
+                  description: `Capital Return: $${amount.toFixed(2)} principal returned from completed ${s.plan.title || 'Staking Plan'}`,
+                },
+              }).catch(() => null);
+            }
+          }
         }
       }
     }
 
-    if (totalNewProfitToCredit > 0) {
-      const dbUser = await prisma.users.findUnique({ where: { id: userId } });
-      if (dbUser) {
-        await prisma.users.update({
-          where: { id: userId },
-          data: {
-            staked_balance: parseFloat(dbUser.staked_balance || 0) + totalNewProfitToCredit,
-            total_earned: parseFloat(dbUser.total_earned || 0) + totalNewProfitToCredit,
-          },
-        }).catch(() => null);
-      }
-    }
-
+    // Re-fetch updated stakes after maturity payouts
     const updatedStakes = await prisma.user_stakes.findMany({
       where: { user_id: userId },
       include: { plan: true },
@@ -274,89 +297,5 @@ export const getUserStakes = async (req, res) => {
     return res.json({ success: true, stakes: formattedStakes });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to fetch user stakes', error: error.message });
-  }
-};
-
-
-
-export const claimStakeProfit = async (req, res) => {
-  try {
-    const { stake_id } = req.body;
-    const userId = req.user.id;
-
-    const stake = await prisma.user_stakes.findFirst({
-      where: { id: stake_id, user_id: userId },
-      include: { plan: true },
-    });
-
-    if (!stake || stake.status !== 'ACTIVE') {
-      return res.status(400).json({ success: false, message: 'Active stake not found' });
-    }
-
-    const now = new Date();
-    const lastClaim = stake.last_claim_date || stake.start_date;
-    const hoursElapsed = (now - new Date(lastClaim)) / (1000 * 60 * 60);
-
-    if (hoursElapsed < 24) {
-      return res.status(400).json({
-        success: false,
-        message: `Daily profit compiles and pays every 24 hours. Next payout in ${Math.ceil(24 - hoursElapsed)} hours.`,
-      });
-    }
-
-    // Compounding profit calculation:FV = PV * (1 + r)
-    const baseAmount = parseFloat(stake.amount) + parseFloat(stake.total_earned);
-    const dailyReturnPercent = parseFloat(stake.plan.daily_return_percent);
-    const claimAmount = (baseAmount * dailyReturnPercent) / 100;
-
-    const user = await prisma.users.findUnique({ where: { id: userId } });
-
-    const newProfitBalance = parseFloat(user.staked_balance || 0) + claimAmount;
-    const newTotalEarned = parseFloat(user.total_earned || 0) + claimAmount;
-    const newStakeEarned = parseFloat(stake.total_earned || 0) + claimAmount;
-
-    let isCompleted = false;
-    if (now >= new Date(stake.end_date) && stake.plan.duration_days > 0) {
-      isCompleted = true;
-    }
-
-    const [updatedStake, updatedUser] = await prisma.$transaction([
-      prisma.user_stakes.update({
-        where: { id: stake.id },
-        data: {
-          total_earned: newStakeEarned,
-          last_claim_date: now,
-          status: isCompleted ? 'COMPLETED' : 'ACTIVE',
-        },
-      }),
-      prisma.users.update({
-        where: { id: userId },
-        data: {
-          staked_balance: newProfitBalance,
-          total_earned: newTotalEarned,
-        },
-      }),
-      prisma.transactions.create({
-        data: {
-          user_id: userId,
-          type: 'STAKE_PROFIT',
-          amount: claimAmount,
-          balance_before: user.staked_balance,
-          balance_after: newProfitBalance,
-          reference_id: stake.id,
-          description: `Claimed compounding profit of $${claimAmount.toFixed(2)} from stake #${stake.id.substring(0, 8)}`,
-        },
-      }),
-    ]);
-
-    return res.json({
-      success: true,
-      message: `Claimed compounding profit of $${claimAmount.toFixed(2)} successfully!`,
-      claimed_amount: claimAmount,
-      stake: updatedStake,
-      user: { balance: updatedUser.balance, total_earned: updatedUser.total_earned },
-    });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: 'Failed to claim profit', error: error.message });
   }
 };
