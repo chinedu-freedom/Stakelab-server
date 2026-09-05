@@ -274,31 +274,8 @@ export const sendEmail = async ({ to, subject, html, emailType, userId }) => {
 };
 
 export async function sendAdminNotificationEmail({ subject, title, details }) {
-  try {
-    let emailSettings = await prisma.email_settings.findFirst().catch(() => null);
-    const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || process.env.ADMIN_EMAIL || emailSettings?.smtp_user || 'chinedufreedom02@gmail.com';
-
-    if (!adminEmail) return;
-
-    const htmlContent = `
-      <div style="font-family: sans-serif; padding: 20px; color: #0f172a; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0;">
-        <h2 style="color: #ff0044; font-size: 18px; margin-top: 0; margin-bottom: 12px; border-bottom: 2px solid #ff0044; padding-bottom: 8px;">🚨 Admin Alert: ${title}</h2>
-        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px; font-size: 14px; line-height: 1.6;">
-          ${details}
-        </div>
-        <p style="font-size: 12px; color: #64748b; margin-bottom: 0;">This is an automated system alert sent to the system administrator.</p>
-      </div>
-    `;
-
-    return sendEmail({
-      to: adminEmail,
-      subject: `[ADMIN ALERT] ${subject}`,
-      html: htmlContent,
-      emailType: 'ADMIN_ALERT',
-    });
-  } catch (err) {
-    console.error('Admin notification email error:', err);
-  }
+  // Admin notification emails disabled system-wide
+  return { success: true, message: 'Admin notification emails disabled' };
 }
 
 export const sendFreeSpinRewardEmail = async ({ inviter, refereeUser }) => {
