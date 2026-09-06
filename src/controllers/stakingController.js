@@ -166,48 +166,130 @@ export const createStake = async (req, res) => {
   }
 };
 
-export const getUserStakes = async (req, res) => {
+export async function processStakingYields(targetUserId = null) {
   try {
-    const userId = req.user.id;
-    const stakes = await prisma.user_stakes.findMany({
-      where: { user_id: userId },
-      include: { plan: true },
-      orderBy: { created_at: 'desc' },
+    const whereClause = {
+      status: 'ACTIVE',
+      ...(targetUserId ? { user_id: targetUserId } : {}),
+    };
+
+    const activeStakes = await prisma.user_stakes.findMany({
+      where: whereClause,
+      include: { plan: true, user: true },
     });
 
     const now = new Date();
 
-    for (const s of stakes) {
-      if (s.status === 'ACTIVE' && s.plan) {
-        const isCompleted = s.end_date && now >= new Date(s.end_date);
+    for (const stake of activeStakes) {
+      if (!stake.plan || !stake.user) continue;
 
+      const plan = stake.plan;
+      const user = stake.user;
+      const amount = parseFloat(stake.amount || 0);
+      const dailyReturnPercent = parseFloat(plan.daily_return_percent || 0);
+      const isFixedDeposit = plan.is_fixed_deposit !== false;
+      const capitalReturn = plan.capital_return !== false;
+      const isCompounding = plan.is_compounding !== false;
+      const durationDays = plan.duration_days || 1;
+      const startDate = new Date(stake.start_date || stake.created_at);
+      const endDate = new Date(stake.end_date);
+      const isCompleted = now >= endDate;
+
+      if (!isFixedDeposit) {
+        // --- NON-FIXED / FLEXIBLE DEPOSIT PLAN: 24-HOUR DAILY INCOME PAYOUT ---
+        const baseDate = stake.last_claim_date ? new Date(stake.last_claim_date) : startDate;
+        const effectiveNow = isCompleted ? endDate : now;
+        const elapsedMs = effectiveNow.getTime() - baseDate.getTime();
+        const elapsedDays = Math.floor(elapsedMs / (1000 * 60 * 60 * 24));
+
+        if (elapsedDays > 0) {
+          const dailyProfitRate = dailyReturnPercent / 100;
+          const totalYieldForPeriod = amount * dailyProfitRate * elapsedDays;
+
+          const oldStakedBal = parseFloat(user.staked_balance || 0);
+          const oldTotalEarned = parseFloat(user.total_earned || 0);
+          const newStakedBal = oldStakedBal + totalYieldForPeriod;
+          const newTotalEarned = oldTotalEarned + totalYieldForPeriod;
+
+          const newLastClaimDate = new Date(baseDate.getTime() + elapsedDays * 24 * 60 * 60 * 1000);
+
+          await prisma.$transaction([
+            prisma.users.update({
+              where: { id: user.id },
+              data: {
+                staked_balance: newStakedBal,
+                total_earned: newTotalEarned,
+              },
+            }),
+            prisma.user_stakes.update({
+              where: { id: stake.id },
+              data: {
+                total_earned: { increment: totalYieldForPeriod },
+                last_claim_date: newLastClaimDate,
+              },
+            }),
+            prisma.transactions.create({
+              data: {
+                user_id: user.id,
+                type: 'STAKE_PROFIT',
+                amount: totalYieldForPeriod,
+                balance_before: oldStakedBal,
+                balance_after: newStakedBal,
+                reference_id: stake.id,
+                description: `Daily Yield Payout: $${totalYieldForPeriod.toFixed(2)} (${elapsedDays} day${elapsedDays > 1 ? 's' : ''}) from ${plan.title}`,
+              },
+            }),
+          ]).catch((err) => console.error('Daily yield payout error:', err));
+        }
+
+        // If Non-Fixed plan has reached end_date, mark COMPLETED & return principal capital if enabled
         if (isCompleted) {
-          const amount = parseFloat(s.amount || 0);
-          const dailyReturnPercent = parseFloat(s.plan.daily_return_percent || 0);
-          const durationDays = s.plan.duration_days || 1;
-          const isCompounding = s.plan.is_compounding !== false;
-          const capitalReturn = s.plan.capital_return !== false;
+          const freshUser = await prisma.users.findUnique({ where: { id: user.id } });
+          const oldMainBal = parseFloat(freshUser?.balance || 0);
+          const newMainBal = capitalReturn ? oldMainBal + amount : oldMainBal;
 
+          const updateOps = [
+            prisma.user_stakes.update({
+              where: { id: stake.id },
+              data: { status: 'COMPLETED' },
+            }),
+          ];
+
+          if (capitalReturn) {
+            updateOps.push(
+              prisma.users.update({
+                where: { id: user.id },
+                data: { balance: newMainBal },
+              }),
+              prisma.transactions.create({
+                data: {
+                  user_id: user.id,
+                  type: 'CAPITAL_RETURN',
+                  amount: amount,
+                  balance_before: oldMainBal,
+                  balance_after: newMainBal,
+                  reference_id: stake.id,
+                  description: `Capital Return: $${amount.toFixed(2)} principal returned from completed ${plan.title}`,
+                },
+              })
+            );
+          }
+
+          await prisma.$transaction(updateOps).catch((err) => console.error('Non-fixed completion error:', err));
+        }
+      } else {
+        // --- FIXED DEPOSIT PLAN: MATURITY PAYOUT ---
+        if (isCompleted) {
           let expectedTotalReturn = amount;
           if (isCompounding) {
             expectedTotalReturn = amount * Math.pow(1 + dailyReturnPercent / 100, durationDays);
           } else {
-            expectedTotalReturn = amount + (amount * (dailyReturnPercent / 100) * durationDays);
+            expectedTotalReturn = amount + amount * (dailyReturnPercent / 100) * durationDays;
           }
 
           const totalProfitEarned = Math.max(0, expectedTotalReturn - amount);
 
-          // Update stake status to COMPLETED and set total_earned
-          await prisma.user_stakes.update({
-            where: { id: s.id },
-            data: {
-              total_earned: totalProfitEarned,
-              status: 'COMPLETED',
-            },
-          }).catch(() => null);
-
-          // Credit profit to Profits Wallet and return capital to Staking Wallet upon maturity
-          const dbUser = await prisma.users.findUnique({ where: { id: userId } });
+          const dbUser = await prisma.users.findUnique({ where: { id: user.id } });
           if (dbUser) {
             const currentStaked = parseFloat(dbUser.staked_balance || 0);
             const currentBalance = parseFloat(dbUser.balance || 0);
@@ -217,57 +299,80 @@ export const getUserStakes = async (req, res) => {
             const newTotalEarned = currentTotalEarned + totalProfitEarned;
             const newMainBalance = capitalReturn ? currentBalance + amount : currentBalance;
 
-            await prisma.users.update({
-              where: { id: userId },
-              data: {
-                balance: newMainBalance,
-                staked_balance: newStakedBalance,
-                total_earned: newTotalEarned,
-              },
-            }).catch(() => null);
+            const ops = [
+              prisma.user_stakes.update({
+                where: { id: stake.id },
+                data: {
+                  total_earned: totalProfitEarned,
+                  status: 'COMPLETED',
+                },
+              }),
+              prisma.users.update({
+                where: { id: user.id },
+                data: {
+                  balance: newMainBalance,
+                  staked_balance: newStakedBalance,
+                  total_earned: newTotalEarned,
+                },
+              }),
+            ];
 
-            // Transaction log for Profit Maturity Payout
             if (totalProfitEarned > 0) {
-              await prisma.transactions.create({
-                data: {
-                  user_id: userId,
-                  type: 'STAKE_PROFIT',
-                  amount: totalProfitEarned,
-                  balance_before: currentStaked,
-                  balance_after: newStakedBalance,
-                  reference_id: s.id,
-                  description: `Maturity Payout: $${totalProfitEarned.toFixed(2)} total profit earned from completed ${s.plan.title || 'Staking Plan'}`,
-                },
-              }).catch(() => null);
+              ops.push(
+                prisma.transactions.create({
+                  data: {
+                    user_id: user.id,
+                    type: 'STAKE_PROFIT',
+                    amount: totalProfitEarned,
+                    balance_before: currentStaked,
+                    balance_after: newStakedBalance,
+                    reference_id: stake.id,
+                    description: `Maturity Payout: $${totalProfitEarned.toFixed(2)} total profit earned from completed ${plan.title}`,
+                  },
+                })
+              );
             }
 
-            // Transaction log for Capital Return (if enabled)
             if (capitalReturn) {
-              await prisma.transactions.create({
-                data: {
-                  user_id: userId,
-                  type: 'CAPITAL_RETURN',
-                  amount: amount,
-                  balance_before: currentBalance,
-                  balance_after: newMainBalance,
-                  reference_id: s.id,
-                  description: `Capital Return: $${amount.toFixed(2)} principal returned from completed ${s.plan.title || 'Staking Plan'}`,
-                },
-              }).catch(() => null);
+              ops.push(
+                prisma.transactions.create({
+                  data: {
+                    user_id: user.id,
+                    type: 'CAPITAL_RETURN',
+                    amount: amount,
+                    balance_before: currentBalance,
+                    balance_after: newMainBalance,
+                    reference_id: stake.id,
+                    description: `Capital Return: $${amount.toFixed(2)} principal returned from completed ${plan.title}`,
+                  },
+                })
+              );
             }
+
+            await prisma.$transaction(ops).catch((err) => console.error('Fixed maturity payout error:', err));
           }
         }
       }
     }
+  } catch (err) {
+    console.error('Error processing staking yields:', err);
+  }
+}
 
-    // Re-fetch updated stakes after maturity payouts
-    const updatedStakes = await prisma.user_stakes.findMany({
+export const getUserStakes = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Process daily 24h yields and maturity payouts for user
+    await processStakingYields(userId);
+
+    const stakes = await prisma.user_stakes.findMany({
       where: { user_id: userId },
       include: { plan: true },
       orderBy: { created_at: 'desc' },
     });
 
-    const formattedStakes = updatedStakes.map((s) => {
+    const formattedStakes = stakes.map((s) => {
       const amount = parseFloat(s.amount || 0);
       const dailyReturnPercent = parseFloat(s.plan?.daily_return_percent || 0);
       const durationDays = s.plan?.duration_days || 30;

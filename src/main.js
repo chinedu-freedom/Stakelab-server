@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import apiRoutes from './routes/index.js';
 import { seedDefaultStakingPlans, cleanupDuplicateStakingPlans } from './seed.js';
+import { processStakingYields } from './controllers/stakingController.js';
 
 dotenv.config();
 
@@ -41,4 +42,10 @@ app.listen(PORT, async () => {
   console.log(`🚀 Stakelab Backend API running on http://localhost:${PORT}`);
   await seedDefaultStakingPlans();
   await cleanupDuplicateStakingPlans();
+  
+  // Background runner: Process daily yields & maturity payouts on startup & every 1 hour
+  processStakingYields().catch(() => null);
+  setInterval(() => {
+    processStakingYields().catch(() => null);
+  }, 60 * 60 * 1000);
 });
