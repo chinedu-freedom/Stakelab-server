@@ -282,7 +282,11 @@ export const sendFreeSpinRewardEmail = async ({ inviter, refereeUser }) => {
   try {
     const settings = await prisma.settings.findFirst().catch(() => null);
     const siteName = settings?.site_name || settings?.site_title || 'EverStake';
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    let frontendUrl = process.env.FRONTEND_URL || process.env.SITE_URL || settings?.site_url || 'https://everstake.cx';
+    if (!frontendUrl.startsWith('http://') && !frontendUrl.startsWith('https://')) {
+      frontendUrl = `https://${frontendUrl}`;
+    }
+    frontendUrl = frontendUrl.replace(/\/$/, '');
 
     const inviterName = inviter.full_name ? inviter.full_name.split(' ')[0] : (inviter.username || 'Friend');
     const refereeHandle = refereeUser.username || refereeUser.full_name || refereeUser.email.split('@')[0];
