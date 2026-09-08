@@ -971,27 +971,26 @@ export const getAdminStakingHistory = async (req, res) => {
 };
 
 export let referralConfigStore = {
+  enabled: true,
+  levels: [
+    { level: 1, percent: 10 },
+    { level: 2, percent: 5 },
+    { level: 3, percent: 3 },
+  ],
   depositEnabled: true,
   depositLevels: [
     { level: 1, percent: 10 },
     { level: 2, percent: 5 },
     { level: 3, percent: 3 },
   ],
-  stakingEnabled: true,
-  stakingLevels: [
-    { level: 1, percent: 5 },
-    { level: 2, percent: 3 },
-    { level: 3, percent: 1 },
-  ],
 };
 
-export async function processReferralCommissions({ userId, amount, sourceUser, eventType }) {
+export async function processReferralCommissions({ userId, amount, sourceUser }) {
   try {
-    const isStaking = eventType === 'STAKING';
-    const isEnabled = isStaking ? referralConfigStore.stakingEnabled : referralConfigStore.depositEnabled;
+    const isEnabled = referralConfigStore.enabled !== undefined ? referralConfigStore.enabled : referralConfigStore.depositEnabled;
     if (!isEnabled) return;
 
-    const levels = isStaking ? referralConfigStore.stakingLevels : referralConfigStore.depositLevels;
+    const levels = referralConfigStore.levels || referralConfigStore.depositLevels;
     if (!Array.isArray(levels) || levels.length === 0) return;
 
     let currentInviterId = sourceUser?.referred_by;
@@ -1024,7 +1023,7 @@ export async function processReferralCommissions({ userId, amount, sourceUser, e
                 amount: commissionAmount,
                 balance_before: inviter.staked_balance,
                 balance_after: inviterNewProfit,
-                description: `Level ${levelObj.level || i + 1} ${isStaking ? 'Staking' : 'Deposit'} Referral Commission (${levelPercent}%) from @${sourceUser.username || sourceUser.full_name}'s $${amount} ${isStaking ? 'staking' : 'deposit'}`,
+                description: `Level ${levelObj.level || i + 1} Referral Commission (${levelPercent}%) from @${sourceUser.username || sourceUser.full_name}'s $${amount} investment`,
               },
             }),
           ]);
@@ -1044,23 +1043,25 @@ export const getReferralSettings = async (req, res) => {
 
 export const updateReferralSettings = async (req, res) => {
   try {
-    const { depositEnabled, depositLevels, stakingEnabled, stakingLevels } = req.body;
-    if (depositEnabled !== undefined) referralConfigStore.depositEnabled = Boolean(depositEnabled);
-    if (stakingEnabled !== undefined) referralConfigStore.stakingEnabled = Boolean(stakingEnabled);
-    if (Array.isArray(depositLevels)) {
-      referralConfigStore.depositLevels = depositLevels.map((d) => ({
+    const { enabled, levels, depositEnabled, depositLevels } = req.body;
+
+    const isEnabled = enabled !== undefined ? enabled : depositEnabled;
+    if (isEnabled !== undefined) {
+      referralConfigStore.enabled = Boolean(isEnabled);
+      referralConfigStore.depositEnabled = Boolean(isEnabled);
+    }
+
+    const inputLevels = levels || depositLevels;
+    if (Array.isArray(inputLevels)) {
+      const formattedLevels = inputLevels.map((d) => ({
         level: Number(d.level),
         percent: parseFloat(d.percent || 0),
       }));
-    }
-    if (Array.isArray(stakingLevels)) {
-      referralConfigStore.stakingLevels = stakingLevels.map((s) => ({
-        level: Number(s.level),
-        percent: parseFloat(s.percent || 0),
-      }));
+      referralConfigStore.levels = formattedLevels;
+      referralConfigStore.depositLevels = formattedLevels;
     }
 
-    const topComm = referralConfigStore.depositLevels[0]?.percent || 10;
+    const topComm = referralConfigStore.levels[0]?.percent || 10;
     const existing = await prisma.settings.findFirst();
     if (existing) {
       await prisma.settings.update({

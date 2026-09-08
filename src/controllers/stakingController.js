@@ -134,13 +134,12 @@ export const createStake = async (req, res) => {
       }),
     ]);
 
-    // Referral Commission & Free Spin Reward Logic (Dynamic Admin Configured)
+    // Referral Commission Logic (Dynamic Admin Configured)
     if (user.referred_by) {
       await processReferralCommissions({
         userId: user.id,
         amount: stakeAmount,
         sourceUser: user,
-        eventType: 'STAKING',
       });
     }
 
