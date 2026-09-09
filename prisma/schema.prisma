@@ -65,6 +65,10 @@ model users {
   email_logs          email_logs[]
   user_wallets        user_wallets[]
   support_tickets     support_tickets[]
+  gift_code_claims    gift_code_claims[]
+  user_task_claims    user_task_claims[]
+  user_daily_checkins user_daily_checkins?
+  user_spin_logs      user_spin_logs[]
 
   @@map("users")
 }
@@ -117,6 +121,8 @@ model deposits {
   id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   user_id            String    @db.Uuid
   amount             Decimal   @db.Decimal(18, 8)
+  charge             Decimal   @default(0) @db.Decimal(18, 8)
+  total_amount       Decimal?  @db.Decimal(18, 8)
   payment_method     String    // USDT, BTC, ETH
   crypto_amount      Decimal?  @db.Decimal(18, 8)
   proof_image        String?
@@ -254,6 +260,7 @@ model settings {
   currency_symbol          String   @default("$")
   min_deposit              Decimal  @default(10) @db.Decimal(18, 8)
   max_deposit              Decimal  @default(100000) @db.Decimal(18, 8)
+  deposit_charge           Decimal  @default(0) @db.Decimal(18, 8)
   min_withdrawal           Decimal  @default(10) @db.Decimal(18, 8)
   max_withdrawal           Decimal  @default(10000) @db.Decimal(18, 8)
   withdrawal_charge        Decimal  @default(1) @db.Decimal(18, 8)
@@ -332,4 +339,126 @@ model ticket_messages {
 
   @@index([ticket_id])
   @@map("ticket_messages")
+}
+
+model site_cms_content {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key                 String   @unique
+  content             Json
+  updated_at          DateTime @updatedAt
+
+  @@map("site_cms_content")
+}
+
+model gift_codes {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code        String   @unique
+  reward      Decimal  @db.Decimal(18, 8)
+  max_claims  Int      @default(100)
+  used_claims Int      @default(0)
+  status      Boolean  @default(true)
+  created_at  DateTime @default(now())
+
+  claims gift_code_claims[]
+
+  @@map("gift_codes")
+}
+
+model gift_code_claims {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code_id    String   @db.Uuid
+  user_id    String   @db.Uuid
+  reward     Decimal  @db.Decimal(18, 8)
+  claimed_at DateTime @default(now())
+
+  gift_code gift_codes @relation(fields: [code_id], references: [id], onDelete: Cascade)
+  user      users      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([code_id, user_id])
+  @@map("gift_code_claims")
+}
+
+model system_tasks {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String
+  description String
+  reward      Decimal  @db.Decimal(18, 8)
+  link        String?
+  req_type    String?
+  req_value   Int?     @default(1)
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+
+  claims user_task_claims[]
+
+  @@map("system_tasks")
+}
+
+model user_task_claims {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_id    String   @db.Uuid
+  user_id    String   @db.Uuid
+  claimed_at DateTime @default(now())
+
+  task system_tasks @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  user users        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([task_id, user_id])
+  @@map("user_task_claims")
+}
+
+model daily_checkin_settings {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  day        Int      @unique
+  reward     Decimal  @db.Decimal(18, 8)
+  is_active  Boolean  @default(true)
+  updated_at DateTime @updatedAt
+
+  @@map("daily_checkin_settings")
+}
+
+model user_daily_checkins {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String   @unique @db.Uuid
+  last_day   Int      @default(0)
+  last_date  String
+  streak     Int      @default(0)
+  updated_at DateTime @updatedAt
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("user_daily_checkins")
+}
+
+model spin_prizes {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label       String
+  value       Decimal  @db.Decimal(18, 8)
+  color       String?
+  probability Float    @default(10)
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+
+  @@map("spin_prizes")
+}
+
+model user_spin_logs {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id     String   @db.Uuid
+  prize_label String
+  prize_value Decimal  @db.Decimal(18, 8)
+  created_at  DateTime @default(now())
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("user_spin_logs")
+}
+
+model system_feature_toggles {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key        String   @unique
+  is_enabled Boolean  @default(true)
+  updated_at DateTime @updatedAt
+
+  @@map("system_feature_toggles")
 }

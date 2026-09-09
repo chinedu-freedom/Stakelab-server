@@ -1,5 +1,5 @@
 import { prisma } from '../config/db.js';
-import { sendEmail, sendAdminNotificationEmail } from '../services/emailService.js';
+import { sendEmail, sendAdminNotificationEmail, sendStakeActivatedEmail, sendStakeCompletedEmail } from '../services/emailService.js';
 import { processReferralCommissions } from './adminController.js';
 
 export const getStakingPlans = async (req, res) => {
@@ -49,9 +49,10 @@ export const createStake = async (req, res) => {
     }
 
     // Prerequisite Check: User must have an investment in Flexible Tier before investing in Dynamic Tier
+    const planTierUpper = (plan.tier || '').toUpperCase();
     const planTitleUpper = (plan.title || plan.name || '').toUpperCase();
     const planBadgeUpper = (plan.badge || '').toUpperCase();
-    const isDynamicTier = planTitleUpper.includes('DYNAMIC') || planBadgeUpper.includes('DYNAMIC');
+    const isDynamicTier = planTierUpper.includes('DYNAMIC') || planTitleUpper.includes('DYNAMIC') || planBadgeUpper.includes('DYNAMIC');
 
     if (isDynamicTier) {
       const userStakes = await prisma.user_stakes.findMany({
@@ -60,14 +61,16 @@ export const createStake = async (req, res) => {
       });
 
       const hasFlexibleStake = userStakes.some((s) => {
-        const pTitle = (s.plan?.title || s.plan?.name || '').toUpperCase();
-        const pBadge = (s.plan?.badge || '').toUpperCase();
+        if (!s.plan) return false;
+        const pTierUpper = (s.plan.tier || '').toUpperCase();
+        const pTitleUpper = (s.plan.title || s.plan.name || '').toUpperCase();
+        const pBadgeUpper = (s.plan.badge || '').toUpperCase();
         return (
-          pTitle.includes('FLEXIBLE') ||
-          pBadge.includes('FLEXIBLE') ||
-          pTitle.includes('STANDARD') ||
-          pBadge.includes('STANDARD') ||
-          (!pTitle.includes('DYNAMIC') && !pBadge.includes('DYNAMIC'))
+          pTierUpper.includes('FLEXIBLE') ||
+          pTitleUpper.includes('FLEXIBLE') ||
+          pBadgeUpper.includes('FLEXIBLE') ||
+          (pTierUpper !== '' && !pTierUpper.includes('DYNAMIC')) ||
+          (!pTitleUpper.includes('DYNAMIC') && !pBadgeUpper.includes('DYNAMIC'))
         );
       });
 
@@ -145,6 +148,8 @@ export const createStake = async (req, res) => {
 
 
 
+    sendStakeActivatedEmail({ user, stake, plan }).catch(() => null);
+
     sendAdminNotificationEmail({
       subject: `New Investment: $${stakeAmount.toFixed(2)} in ${plan.title} by @${user.username || user.full_name}`,
       title: 'New Staking Investment Created',
@@ -153,7 +158,7 @@ export const createStake = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: `Successfully staked $${stakeAmount} with compounding daily yield!`,
+      message: `Your staking plan has been successfully activated.`,
       stake: { ...stake, is_compounding: is_compounding },
       user: {
         balance: updatedUser.balance,
@@ -275,6 +280,14 @@ export async function processStakingYields(targetUserId = null) {
           }
 
           await prisma.$transaction(updateOps).catch((err) => console.error('Non-fixed completion error:', err));
+
+          sendStakeCompletedEmail({
+            user,
+            stake,
+            plan,
+            totalProfit: parseFloat(stake.total_earned || 0),
+            capitalReturned: capitalReturn ? amount : 0,
+          }).catch(() => null);
         }
       } else {
         // --- FIXED DEPOSIT PLAN: MATURITY PAYOUT ---
@@ -349,6 +362,14 @@ export async function processStakingYields(targetUserId = null) {
             }
 
             await prisma.$transaction(ops).catch((err) => console.error('Fixed maturity payout error:', err));
+
+            sendStakeCompletedEmail({
+              user,
+              stake,
+              plan,
+              totalProfit: totalProfitEarned,
+              capitalReturned: capitalReturn ? amount : 0,
+            }).catch(() => null);
           }
         }
       }

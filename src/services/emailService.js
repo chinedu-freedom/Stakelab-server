@@ -382,3 +382,273 @@ export const sendFreeSpinRewardEmail = async ({ inviter, refereeUser }) => {
     console.error('Error sending free spin reward email:', err);
   }
 };
+
+export const sendStakeActivatedEmail = async ({ user, stake, plan }) => {
+  try {
+    const siteSettings = await prisma.settings.findFirst().catch(() => null);
+    const siteName = siteSettings?.site_name || 'EverStake';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://everstake.cx';
+
+    const subject = `Staking Plan Activated: ${plan.title}`;
+    const amountStr = `$${parseFloat(stake.amount || 0).toFixed(2)}`;
+    const dailyProfitStr = `$${parseFloat(stake.daily_profit || 0).toFixed(2)}`;
+    const startDateStr = new Date(stake.start_date || stake.created_at || Date.now()).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+    const endDateStr = new Date(stake.end_date || Date.now()).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f4f6f9; font-family:'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing:antialiased;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#f4f6f9; padding:40px 15px;">
+    <tr>
+      <td align="center">
+        <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color:#ffffff; border-radius:16px; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; width:100%; max-width:600px;">
+          
+          <!-- Header Banner -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding:32px 35px; text-align:center;">
+              <h1 style="color:#ffffff; margin:0; font-size:24px; font-weight:800; letter-spacing:1px;">${siteName}</h1>
+              <span style="display:inline-block; background:#ff0044; color:#ffffff; font-size:11px; font-weight:800; padding:4px 12px; border-radius:20px; text-transform:uppercase; margin-top:8px; letter-spacing:1px;">
+                Staking Active
+              </span>
+            </td>
+          </tr>
+
+          <!-- Main Content Body -->
+          <tr>
+            <td style="padding:35px 30px; color:#1e293b;">
+              <h2 style="margin-top:0; color:#0f172a; font-size:20px; font-weight:700; line-height:1.4;">
+                Hello ${user.full_name || user.username || 'Valued Staker'},
+              </h2>
+              <p style="font-size:15px; line-height:1.6; color:#475569; margin-top:12px;">
+                Your new staking investment has been successfully activated on <strong>${siteName}</strong>. Below is the full summary of your active plan details:
+              </p>
+
+              <!-- RESPONSIVE PLAN INFORMATION TABLE -->
+              <div style="margin:25px 0; overflow-x:auto; border-radius:12px; border:1px solid #e2e8f0; background-color:#f8fafc;">
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; font-size:14px; width:100%;">
+                  <thead>
+                    <tr style="background-color:#0f172a; color:#ffffff;">
+                      <th colspan="2" style="padding:14px 18px; text-align:left; font-size:14px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">
+                        Plan Overview & Investment Details
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style="border-bottom:1px solid #e2e8f0;">
+                      <td style="padding:12px 18px; color:#64748b; font-weight:600; width:45%;">Plan Name</td>
+                      <td style="padding:12px 18px; color:#0f172a; font-weight:700; text-align:right;">${plan.title}</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid #e2e8f0; background-color:#ffffff;">
+                      <td style="padding:12px 18px; color:#64748b; font-weight:600;">Staking Tier</td>
+                      <td style="padding:12px 18px; color:#ff0044; font-weight:700; text-align:right;">${plan.tier || 'Flexible Tier'}</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid #e2e8f0;">
+                      <td style="padding:12px 18px; color:#64748b; font-weight:600;">Staked Principal</td>
+                      <td style="padding:12px 18px; color:#059669; font-weight:800; font-size:15px; text-align:right;">${amountStr} USDT</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid #e2e8f0; background-color:#ffffff;">
+                      <td style="padding:12px 18px; color:#64748b; font-weight:600;">Daily Return Rate</td>
+                      <td style="padding:12px 18px; color:#0f172a; font-weight:700; text-align:right;">${plan.daily_return_percent}% Daily</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid #e2e8f0;">
+                      <td style="padding:12px 18px; color:#64748b; font-weight:600;">Est. Daily Yield</td>
+                      <td style="padding:12px 18px; color:#2563eb; font-weight:700; text-align:right;">${dailyProfitStr} USDT</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid #e2e8f0; background-color:#ffffff;">
+                      <td style="padding:12px 18px; color:#64748b; font-weight:600;">Duration Period</td>
+                      <td style="padding:12px 18px; color:#0f172a; font-weight:700; text-align:right;">${plan.duration_days} Days</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid #e2e8f0;">
+                      <td style="padding:12px 18px; color:#64748b; font-weight:600;">Activation Date</td>
+                      <td style="padding:12px 18px; color:#334155; font-weight:600; text-align:right;">${startDateStr}</td>
+                    </tr>
+                    <tr style="background-color:#ffffff;">
+                      <td style="padding:12px 18px; color:#64748b; font-weight:600;">Maturity Date</td>
+                      <td style="padding:12px 18px; color:#334155; font-weight:600; text-align:right;">${endDateStr}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Action Button -->
+              <div style="text-align:center; margin:30px 0 20px 0;">
+                <a href="${frontendUrl}/dashboard" style="background: linear-gradient(135deg, #ff0044 0%, #fe780b 100%); color:#ffffff; text-decoration:none; padding:14px 36px; border-radius:50px; font-size:15px; font-weight:800; display:inline-block; box-shadow:0 4px 18px rgba(255,0,68,0.3); text-transform:uppercase;">
+                  View My Staking Dashboard
+                </a>
+              </div>
+
+              <p style="font-size:13px; color:#94a3b8; text-align:center; margin-top:20px;">
+                Thank you for choosing ${siteName} for your crypto yield growth!
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#f8fafc; padding:20px 30px; text-align:center; border-top:1px solid #e2e8f0;">
+              <p style="margin:0; color:#64748b; font-size:12px; line-height:1.5;">
+                &copy; ${new Date().getFullYear()} ${siteName}. All rights reserved.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    await sendEmail({
+      to: user.email,
+      subject,
+      html,
+      emailType: 'STAKE_ACTIVATED',
+      userId: user.id,
+    });
+  } catch (err) {
+    console.error('Error sending stake activated email:', err);
+  }
+};
+
+export const sendStakeCompletedEmail = async ({ user, stake, plan, totalProfit = 0, capitalReturned = 0 }) => {
+  try {
+    const siteSettings = await prisma.settings.findFirst().catch(() => null);
+    const siteName = siteSettings?.site_name || 'EverStake';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://everstake.cx';
+
+    const subject = `Staking Completed: ${plan.title}`;
+    const principalStr = `$${parseFloat(stake.amount || 0).toFixed(2)}`;
+    const profitStr = `$${parseFloat(totalProfit || 0).toFixed(2)}`;
+    const capitalStr = `$${parseFloat(capitalReturned || 0).toFixed(2)}`;
+    const completionDateStr = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f4f6f9; font-family:'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing:antialiased;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#f4f6f9; padding:40px 15px;">
+    <tr>
+      <td align="center">
+        <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color:#ffffff; border-radius:16px; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; width:100%; max-width:600px;">
+          
+          <!-- Header Banner -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); padding:32px 35px; text-align:center;">
+              <h1 style="color:#ffffff; margin:0; font-size:24px; font-weight:800; letter-spacing:1px;">${siteName}</h1>
+              <span style="display:inline-block; background:#ffffff; color:#059669; font-size:11px; font-weight:800; padding:4px 14px; border-radius:20px; text-transform:uppercase; margin-top:8px; letter-spacing:1px;">
+                Plan Completed
+              </span>
+            </td>
+          </tr>
+
+          <!-- Main Content Body -->
+          <tr>
+            <td style="padding:35px 30px; color:#1e293b;">
+              <h2 style="margin-top:0; color:#0f172a; font-size:20px; font-weight:700; line-height:1.4;">
+                Congratulations ${user.full_name || user.username || 'Valued Staker'}! 🎉
+              </h2>
+              <p style="font-size:15px; line-height:1.6; color:#475569; margin-top:12px;">
+                Your staking investment in <strong>${plan.title}</strong> has officially reached maturity and is now <strong>COMPLETED</strong>. All profits and principal capital have been credited to your account balance.
+              </p>
+
+              <!-- RESPONSIVE PLAN COMPLETION TABLE -->
+              <div style="margin:25px 0; overflow-x:auto; border-radius:12px; border:1px solid #e2e8f0; background-color:#f8fafc;">
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; font-size:14px; width:100%;">
+                  <thead>
+                    <tr style="background-color:#059669; color:#ffffff;">
+                      <th colspan="2" style="padding:14px 18px; text-align:left; font-size:14px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">
+                        Maturity & Payout Summary
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style="border-bottom:1px solid #e2e8f0;">
+                      <td style="padding:12px 18px; color:#64748b; font-weight:600; width:45%;">Plan Title</td>
+                      <td style="padding:12px 18px; color:#0f172a; font-weight:700; text-align:right;">${plan.title}</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid #e2e8f0; background-color:#ffffff;">
+                      <td style="padding:12px 18px; color:#64748b; font-weight:600;">Initial Principal</td>
+                      <td style="padding:12px 18px; color:#0f172a; font-weight:700; text-align:right;">${principalStr} USDT</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid #e2e8f0;">
+                      <td style="padding:12px 18px; color:#64748b; font-weight:600;">Total Yield Profit</td>
+                      <td style="padding:12px 18px; color:#059669; font-weight:800; font-size:15px; text-align:right;">+${profitStr} USDT</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid #e2e8f0; background-color:#ffffff;">
+                      <td style="padding:12px 18px; color:#64748b; font-weight:600;">Capital Returned</td>
+                      <td style="padding:12px 18px; color:#2563eb; font-weight:700; text-align:right;">${capitalStr} USDT</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid #e2e8f0;">
+                      <td style="padding:12px 18px; color:#64748b; font-weight:600;">Final Status</td>
+                      <td style="padding:12px 18px; color:#059669; font-weight:800; text-align:right;">COMPLETED</td>
+                    </tr>
+                    <tr style="background-color:#ffffff;">
+                      <td style="padding:12px 18px; color:#64748b; font-weight:600;">Completion Date</td>
+                      <td style="padding:12px 18px; color:#334155; font-weight:600; text-align:right;">${completionDateStr}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Action Button -->
+              <div style="text-align:center; margin:30px 0 20px 0;">
+                <a href="${frontendUrl}/plans" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); color:#ffffff; text-decoration:none; padding:14px 36px; border-radius:50px; font-size:15px; font-weight:800; display:inline-block; box-shadow:0 4px 18px rgba(5,150,105,0.3); text-transform:uppercase;">
+                  Re-invest & Grow More
+                </a>
+              </div>
+
+              <p style="font-size:13px; color:#94a3b8; text-align:center; margin-top:20px;">
+                You can withdraw your funds anytime or re-invest into high-yielding staking plans on ${siteName}.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#f8fafc; padding:20px 30px; text-align:center; border-top:1px solid #e2e8f0;">
+              <p style="margin:0; color:#64748b; font-size:12px; line-height:1.5;">
+                &copy; ${new Date().getFullYear()} ${siteName}. All rights reserved.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    await sendEmail({
+      to: user.email,
+      subject,
+      html,
+      emailType: 'STAKE_COMPLETED',
+      userId: user.id,
+    });
+  } catch (err) {
+    console.error('Error sending stake completed email:', err);
+  }
+};

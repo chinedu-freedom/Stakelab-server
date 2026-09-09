@@ -2,7 +2,6 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../config/db.js';
 import { sendEmail, sendAdminNotificationEmail, sendFreeSpinRewardEmail } from '../services/emailService.js';
-import { inMemoryGeneralSettings } from './adminController.js';
 
 const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY || '6LffwZUtAAAAALsM0OkIFctHSBITmbn7AZLg3caC';
 
@@ -101,7 +100,13 @@ export const register = async (req, res) => {
 
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-    const bonus = parseFloat(inMemoryGeneralSettings?.registrationBonus || 0);
+    let bonus = 0;
+    try {
+      const generalExtra = await prisma.site_cms_content.findUnique({ where: { key: 'general_extra_settings' } });
+      if (generalExtra && generalExtra.content?.registrationBonus) {
+        bonus = parseFloat(generalExtra.content.registrationBonus || 0);
+      }
+    } catch (e) {}
 
     const user = await prisma.users.create({
       data: {

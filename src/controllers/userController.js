@@ -190,7 +190,7 @@ export const getPublicRecentActivity = async (req, res) => {
 
 
 
-let customTestimonials = [
+const defaultTestimonials = [
   {
     name: 'Liam O’Connor',
     country: 'Ireland',
@@ -211,7 +211,7 @@ let customTestimonials = [
   },
 ];
 
-let customHowItWorks = [
+const defaultHowItWorks = [
   {
     num: '1',
     title: 'Create Your Account',
@@ -239,29 +239,7 @@ let customHowItWorks = [
   },
 ];
 
-export const getHowItWorks = async (req, res) => {
-  return res.json({ success: true, steps: customHowItWorks });
-};
-
-export const updateHowItWorks = async (req, res) => {
-  if (req.body.steps && Array.isArray(req.body.steps)) {
-    customHowItWorks = req.body.steps;
-  }
-  return res.json({ success: true, message: 'How It Works steps updated successfully', steps: customHowItWorks });
-};
-
-export const getTestimonials = async (req, res) => {
-  return res.json({ success: true, testimonials: customTestimonials });
-};
-
-export const updateTestimonials = async (req, res) => {
-  if (req.body.testimonials && Array.isArray(req.body.testimonials)) {
-    customTestimonials = req.body.testimonials;
-  }
-  return res.json({ success: true, message: 'Testimonials updated successfully', testimonials: customTestimonials });
-};
-
-let customAnnouncements = [
+const defaultAnnouncements = [
   {
     id: '1',
     date: '18 March, 2024',
@@ -285,7 +263,7 @@ let customAnnouncements = [
   },
 ];
 
-let customPartners = [
+const defaultPartners = [
   { name: 'Binance', logo: 'https://cryptologos.cc/logos/binance-coin-bnb-logo.png', status: 'ACTIVE' },
   { name: 'Bybit', logo: 'https://cryptologos.cc/logos/bybit-logo.png', status: 'ACTIVE' },
   { name: 'Mexc', logo: 'https://cryptologos.cc/logos/mexc-logo.png', status: 'ACTIVE' },
@@ -296,70 +274,13 @@ let customPartners = [
   { name: 'Luno', logo: 'https://cryptologos.cc/logos/luno-logo.png', status: 'ACTIVE' },
 ];
 
-export const getAnnouncements = async (req, res) => {
-  return res.json({ success: true, announcements: customAnnouncements });
-};
-
-export const updateAnnouncements = async (req, res) => {
-  if (req.body.announcements && Array.isArray(req.body.announcements)) {
-    customAnnouncements = req.body.announcements;
-  }
-  return res.json({ success: true, message: 'Announcements updated successfully', announcements: customAnnouncements });
-};
-
-export const getPartners = async (req, res) => {
-  return res.json({ success: true, partners: customPartners });
-};
-
-export const updatePartners = async (req, res) => {
-  if (req.body.partners && Array.isArray(req.body.partners)) {
-    customPartners = req.body.partners;
-  }
-  return res.json({ success: true, message: 'Exchange Partners updated successfully', partners: customPartners });
-};
-
-let customContactLinks = {
+const defaultContactLinks = {
   whatsappSupport: 'https://wa.me/1234567890',
   telegramChannel: 'https://t.me/stakelab_community_channel',
   whatsappGroupModal: 'https://chat.whatsapp.com/stakelab_vip_group',
 };
 
-export const getContactLinks = async (req, res) => {
-  try {
-    const s = await prisma.settings.findFirst();
-    if (s && s.telegram_support) {
-      customContactLinks.telegramChannel = s.telegram_support;
-    }
-  } catch (e) {}
-  return res.json({ success: true, contactLinks: customContactLinks });
-};
-
-export const updateContactLinks = async (req, res) => {
-  if (req.body) {
-    customContactLinks = { ...customContactLinks, ...req.body };
-    try {
-      const tg = req.body.telegramChannel || req.body.telegram_support;
-      if (tg) {
-        const existing = await prisma.settings.findFirst();
-        if (existing) {
-          await prisma.settings.update({
-            where: { id: existing.id },
-            data: { telegram_support: tg },
-          });
-        } else {
-          await prisma.settings.create({
-            data: { telegram_support: tg },
-          });
-        }
-      }
-    } catch (e) {}
-  }
-  return res.json({ success: true, message: 'Contact links updated successfully', contactLinks: customContactLinks });
-};
-
-
-
-let customWhyChooseUs = [
+const defaultWhyChooseUs = [
   {
     title: 'Institutional Security',
     desc: 'Enterprise-grade non-custodial validator architecture with robust security controls and risk management.',
@@ -392,48 +313,169 @@ let customWhyChooseUs = [
   },
 ];
 
+const getCmsItem = async (key, defaultVal) => {
+  try {
+    const record = await prisma.site_cms_content.findUnique({ where: { key } });
+    if (record && record.content) return record.content;
+  } catch (e) {}
+  return defaultVal;
+};
+
+const setCmsItem = async (key, content) => {
+  try {
+    await prisma.site_cms_content.upsert({
+      where: { key },
+      update: { content },
+      create: { key, content },
+    });
+  } catch (e) {
+    console.error(`Failed to persist CMS key ${key}:`, e);
+  }
+};
+
+export const getHowItWorks = async (req, res) => {
+  const steps = await getCmsItem('how_it_works', defaultHowItWorks);
+  return res.json({ success: true, steps });
+};
+
+export const updateHowItWorks = async (req, res) => {
+  if (req.body.steps && Array.isArray(req.body.steps)) {
+    await setCmsItem('how_it_works', req.body.steps);
+  }
+  const steps = await getCmsItem('how_it_works', defaultHowItWorks);
+  return res.json({ success: true, message: 'How It Works steps updated successfully', steps });
+};
+
+export const getTestimonials = async (req, res) => {
+  const testimonials = await getCmsItem('testimonials', defaultTestimonials);
+  return res.json({ success: true, testimonials });
+};
+
+export const updateTestimonials = async (req, res) => {
+  if (req.body.testimonials && Array.isArray(req.body.testimonials)) {
+    await setCmsItem('testimonials', req.body.testimonials);
+  }
+  const testimonials = await getCmsItem('testimonials', defaultTestimonials);
+  return res.json({ success: true, message: 'Testimonials updated successfully', testimonials });
+};
+
+export const getAnnouncements = async (req, res) => {
+  const announcements = await getCmsItem('announcements', defaultAnnouncements);
+  return res.json({ success: true, announcements });
+};
+
+export const updateAnnouncements = async (req, res) => {
+  if (req.body.announcements && Array.isArray(req.body.announcements)) {
+    await setCmsItem('announcements', req.body.announcements);
+  }
+  const announcements = await getCmsItem('announcements', defaultAnnouncements);
+  return res.json({ success: true, message: 'Announcements updated successfully', announcements });
+};
+
+export const getPartners = async (req, res) => {
+  const partners = await getCmsItem('partners', defaultPartners);
+  return res.json({ success: true, partners });
+};
+
+export const updatePartners = async (req, res) => {
+  if (req.body.partners && Array.isArray(req.body.partners)) {
+    await setCmsItem('partners', req.body.partners);
+  }
+  const partners = await getCmsItem('partners', defaultPartners);
+  return res.json({ success: true, message: 'Exchange Partners updated successfully', partners });
+};
+
+export const getContactLinks = async (req, res) => {
+  const contactLinks = await getCmsItem('contact_links', defaultContactLinks);
+  try {
+    const s = await prisma.settings.findFirst();
+    if (s && s.telegram_support) {
+      contactLinks.telegramChannel = s.telegram_support;
+    }
+  } catch (e) {}
+  return res.json({ success: true, contactLinks });
+};
+
+export const updateContactLinks = async (req, res) => {
+  if (req.body) {
+    const existingLinks = await getCmsItem('contact_links', defaultContactLinks);
+    const updatedLinks = { ...existingLinks, ...req.body };
+    await setCmsItem('contact_links', updatedLinks);
+    try {
+      const tg = req.body.telegramChannel || req.body.telegram_support;
+      if (tg) {
+        const existing = await prisma.settings.findFirst();
+        if (existing) {
+          await prisma.settings.update({
+            where: { id: existing.id },
+            data: { telegram_support: tg },
+          });
+        } else {
+          await prisma.settings.create({
+            data: { telegram_support: tg },
+          });
+        }
+      }
+    } catch (e) {}
+    return res.json({ success: true, message: 'Contact links updated successfully', contactLinks: updatedLinks });
+  }
+  const contactLinks = await getCmsItem('contact_links', defaultContactLinks);
+  return res.json({ success: true, contactLinks });
+};
+
 export const getWhyChooseUs = async (req, res) => {
-  return res.json({ success: true, items: customWhyChooseUs });
+  const items = await getCmsItem('why_choose_us', defaultWhyChooseUs);
+  return res.json({ success: true, items });
 };
 
 export const updateWhyChooseUs = async (req, res) => {
   if (req.body.items && Array.isArray(req.body.items)) {
-    customWhyChooseUs = req.body.items;
+    await setCmsItem('why_choose_us', req.body.items);
   }
-  return res.json({ success: true, message: 'Why Choose Us section updated successfully', items: customWhyChooseUs });
-};
-
-let customDepositWithdrawalSettings = {
-  dailyWithdrawLimit: '5',
-  minDeposit: '1.00',
-  maxDeposit: '50000.00',
-  depositCharge: '0.00',
-  minPayout: '2.00',
-  maxPayout: '1000.00',
-  payoutCharge: '1.00',
-  rechargeNotice: '• All deposits are verified on the blockchain automatically.\n• Please send exact amounts to official generated wallet address.\n• Minimum deposit limit: $1.00.\n• Deposits below min limits cannot be credited.',
-  withdrawNotice: '• Safely withdraw your funds using our highly secure process and various withdrawal methods.\n• Minimum withdrawal limit: $2.00.\n• Processing time: 1–24 hours.\n• Security PIN verification is required for all payout requests.',
+  const items = await getCmsItem('why_choose_us', defaultWhyChooseUs);
+  return res.json({ success: true, message: 'Why Choose Us section updated successfully', items });
 };
 
 export const getDepositWithdrawalSettings = async (req, res) => {
+  let settingsObj = {
+    dailyWithdrawLimit: '5',
+    minDeposit: '1.00',
+    maxDeposit: '50000.00',
+    depositCharge: '0.00',
+    minPayout: '2.00',
+    maxPayout: '1000.00',
+    payoutCharge: '1.00',
+    rechargeNotice: '• All deposits are verified on the blockchain automatically.\n• Please send exact amounts to official generated wallet address.\n• Minimum deposit limit: $1.00.\n• Deposits below min limits cannot be credited.',
+    withdrawNotice: '• Safely withdraw your funds using our highly secure process and various withdrawal methods.\n• Minimum withdrawal limit: $2.00.\n• Processing time: 1–24 hours.\n• Security PIN verification is required for all payout requests.',
+  };
+
+  const storedNotices = await getCmsItem('deposit_notices', null);
+  if (storedNotices) {
+    settingsObj = { ...settingsObj, ...storedNotices };
+  }
+
   try {
     const dbSettings = await prisma.settings.findFirst();
     if (dbSettings) {
-      if (dbSettings.min_deposit !== null) customDepositWithdrawalSettings.minDeposit = String(dbSettings.min_deposit);
-      if (dbSettings.max_deposit !== null) customDepositWithdrawalSettings.maxDeposit = String(dbSettings.max_deposit);
-      if (dbSettings.min_withdrawal !== null) customDepositWithdrawalSettings.minPayout = String(dbSettings.min_withdrawal);
-      if (dbSettings.max_withdrawal !== null) customDepositWithdrawalSettings.maxPayout = String(dbSettings.max_withdrawal);
-      if (dbSettings.withdrawal_charge !== null) customDepositWithdrawalSettings.payoutCharge = String(dbSettings.withdrawal_charge);
+      if (dbSettings.min_deposit !== null) settingsObj.minDeposit = String(dbSettings.min_deposit);
+      if (dbSettings.max_deposit !== null) settingsObj.maxDeposit = String(dbSettings.max_deposit);
+      if (dbSettings.deposit_charge !== null) settingsObj.depositCharge = String(dbSettings.deposit_charge);
+      if (dbSettings.min_withdrawal !== null) settingsObj.minPayout = String(dbSettings.min_withdrawal);
+      if (dbSettings.max_withdrawal !== null) settingsObj.maxPayout = String(dbSettings.max_withdrawal);
+      if (dbSettings.withdrawal_charge !== null) settingsObj.payoutCharge = String(dbSettings.withdrawal_charge);
     }
   } catch (e) {}
-  return res.json({ success: true, settings: customDepositWithdrawalSettings });
+
+  return res.json({ success: true, settings: settingsObj });
 };
 
 export const updateDepositWithdrawalSettings = async (req, res) => {
   try {
     if (req.body.settings) {
       const s = req.body.settings;
-      customDepositWithdrawalSettings = { ...customDepositWithdrawalSettings, ...s };
+      const existingNotices = await getCmsItem('deposit_notices', {});
+      const updatedNotices = { ...existingNotices, ...s };
+      await setCmsItem('deposit_notices', updatedNotices);
 
       const existing = await prisma.settings.findFirst();
       if (existing) {
@@ -442,6 +484,7 @@ export const updateDepositWithdrawalSettings = async (req, res) => {
           data: {
             ...(s.minDeposit !== undefined && { min_deposit: parseFloat(s.minDeposit) || 0 }),
             ...(s.maxDeposit !== undefined && { max_deposit: parseFloat(s.maxDeposit) || 0 }),
+            ...(s.depositCharge !== undefined && { deposit_charge: parseFloat(s.depositCharge) || 0 }),
             ...(s.minPayout !== undefined && { min_withdrawal: parseFloat(s.minPayout) || 0 }),
             ...(s.maxPayout !== undefined && { max_withdrawal: parseFloat(s.maxPayout) || 0 }),
             ...(s.payoutCharge !== undefined && { withdrawal_charge: parseFloat(s.payoutCharge) || 0 }),
@@ -452,6 +495,7 @@ export const updateDepositWithdrawalSettings = async (req, res) => {
           data: {
             min_deposit: s.minDeposit !== undefined ? parseFloat(s.minDeposit) : 1.0,
             max_deposit: s.maxDeposit !== undefined ? parseFloat(s.maxDeposit) : 50000.0,
+            deposit_charge: s.depositCharge !== undefined ? parseFloat(s.depositCharge) : 0.0,
             min_withdrawal: s.minPayout !== undefined ? parseFloat(s.minPayout) : 2.0,
             max_withdrawal: s.maxPayout !== undefined ? parseFloat(s.maxPayout) : 1000.0,
             withdrawal_charge: s.payoutCharge !== undefined ? parseFloat(s.payoutCharge) : 1.0,
@@ -462,7 +506,6 @@ export const updateDepositWithdrawalSettings = async (req, res) => {
     return res.json({
       success: true,
       message: 'Deposit & Withdrawal settings updated successfully',
-      settings: customDepositWithdrawalSettings,
     });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Failed to update settings', error: err.message });
@@ -564,6 +607,27 @@ export const getUserReferralsData = async (req, res) => {
       stakeMap[s.user_id] = (stakeMap[s.user_id] || 0) + Number(s.amount);
     });
 
+    // Fetch dynamic referral commission settings from DB
+    let refSettings = {
+      enabled: true,
+      levels: [
+        { level: 1, percent: 10 },
+        { level: 2, percent: 5 },
+        { level: 3, percent: 3 },
+      ],
+    };
+    try {
+      const dbRefContent = await prisma.site_cms_content.findUnique({ where: { key: 'referral_settings' } });
+      if (dbRefContent && dbRefContent.content) {
+        refSettings = { ...refSettings, ...dbRefContent.content };
+      }
+    } catch (e) {}
+
+    const levelsArr = refSettings.levels || refSettings.depositLevels || [];
+    const p1 = parseFloat(levelsArr[0]?.percent ?? 10);
+    const p2 = parseFloat(levelsArr[1]?.percent ?? 5);
+    const p3 = parseFloat(levelsArr[2]?.percent ?? 3);
+
     // Fetch referral commission transactions
     const commissionTx = await prisma.transactions.findMany({
       where: {
@@ -575,7 +639,7 @@ export const getUserReferralsData = async (req, res) => {
 
     const totalTeamCommission = commissionTx.reduce((acc, tx) => acc + Number(tx.amount), 0);
 
-    const buildLevelData = (usersList, commPerc) => {
+    const buildLevelData = (usersList, commPerc, levelNum) => {
       let numberActive = 0;
       let totalRecharge = 0;
       let totalStaked = 0;
@@ -607,13 +671,15 @@ export const getUserReferralsData = async (req, res) => {
         numberActive,
         totalRecharge,
         commission,
+        percent: commPerc,
+        commissionRate: `${commPerc.toFixed(2)}%`,
         users: formattedUsers,
       };
     };
 
-    const level1Data = buildLevelData(level1Users, 10);
-    const level2Data = buildLevelData(level2Users, 5);
-    const level3Data = buildLevelData(level3Users, 3);
+    const level1Data = buildLevelData(level1Users, p1, 1);
+    const level2Data = buildLevelData(level2Users, p2, 2);
+    const level3Data = buildLevelData(level3Users, p3, 3);
 
     const totalTeamMembers = level1Data.totalHeadcount + level2Data.totalHeadcount + level3Data.totalHeadcount;
 
@@ -621,6 +687,7 @@ export const getUserReferralsData = async (req, res) => {
       success: true,
       totalTeamMembers,
       teamCommission: totalTeamCommission > 0 ? totalTeamCommission : (level1Data.commission + level2Data.commission + level3Data.commission),
+      referralSettings: refSettings,
       levels: {
         level1: level1Data,
         level2: level2Data,

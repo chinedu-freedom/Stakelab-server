@@ -970,7 +970,29 @@ export const getAdminStakingHistory = async (req, res) => {
   }
 };
 
-export let referralConfigStore = {
+// Database helper for Admin Settings stored in site_cms_content
+async function getAdminSetting(key, defaultValue) {
+  try {
+    const item = await prisma.site_cms_content.findUnique({ where: { key } });
+    return item ? item.content : defaultValue;
+  } catch (e) {
+    return defaultValue;
+  }
+}
+
+async function setAdminSetting(key, contentValue) {
+  try {
+    return await prisma.site_cms_content.upsert({
+      where: { key },
+      update: { content: contentValue },
+      create: { key, content: contentValue },
+    });
+  } catch (e) {
+    console.error(`Failed to set admin setting ${key}:`, e);
+  }
+}
+
+const DEFAULT_REFERRAL_SETTINGS = {
   enabled: true,
   levels: [
     { level: 1, percent: 10 },
@@ -987,10 +1009,11 @@ export let referralConfigStore = {
 
 export async function processReferralCommissions({ userId, amount, sourceUser }) {
   try {
-    const isEnabled = referralConfigStore.enabled !== undefined ? referralConfigStore.enabled : referralConfigStore.depositEnabled;
+    const refSettings = await getAdminSetting('referral_settings', DEFAULT_REFERRAL_SETTINGS);
+    const isEnabled = refSettings.enabled !== undefined ? refSettings.enabled : refSettings.depositEnabled;
     if (!isEnabled) return;
 
-    const levels = referralConfigStore.levels || referralConfigStore.depositLevels;
+    const levels = refSettings.levels || refSettings.depositLevels;
     if (!Array.isArray(levels) || levels.length === 0) return;
 
     let currentInviterId = sourceUser?.referred_by;
@@ -1005,15 +1028,16 @@ export async function processReferralCommissions({ userId, amount, sourceUser })
       if (levelPercent > 0) {
         const commissionAmount = (amount * levelPercent) / 100;
         if (commissionAmount > 0) {
-          const inviterNewProfit = parseFloat(inviter.staked_balance || 0) + commissionAmount;
-          const inviterNewEarned = parseFloat(inviter.total_earned || 0) + commissionAmount;
+          const oldBal = parseFloat(inviter.balance || 0);
+          const newBal = oldBal + commissionAmount;
+          const newEarned = parseFloat(inviter.total_earned || 0) + commissionAmount;
 
           await prisma.$transaction([
             prisma.users.update({
               where: { id: inviter.id },
               data: {
-                staked_balance: inviterNewProfit,
-                total_earned: inviterNewEarned,
+                balance: newBal,
+                total_earned: newEarned,
               },
             }),
             prisma.transactions.create({
@@ -1021,8 +1045,8 @@ export async function processReferralCommissions({ userId, amount, sourceUser })
                 user_id: inviter.id,
                 type: 'REFERRAL_COMMISSION',
                 amount: commissionAmount,
-                balance_before: inviter.staked_balance,
-                balance_after: inviterNewProfit,
+                balance_before: oldBal,
+                balance_after: newBal,
                 description: `Level ${levelObj.level || i + 1} Referral Commission (${levelPercent}%) from @${sourceUser.username || sourceUser.full_name}'s $${amount} investment`,
               },
             }),
@@ -1038,17 +1062,23 @@ export async function processReferralCommissions({ userId, amount, sourceUser })
 }
 
 export const getReferralSettings = async (req, res) => {
-  return res.json({ success: true, referralSettings: referralConfigStore });
+  try {
+    const refSettings = await getAdminSetting('referral_settings', DEFAULT_REFERRAL_SETTINGS);
+    return res.json({ success: true, referralSettings: refSettings });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Failed to fetch referral settings', error: err.message });
+  }
 };
 
 export const updateReferralSettings = async (req, res) => {
   try {
     const { enabled, levels, depositEnabled, depositLevels } = req.body;
+    let currentSettings = await getAdminSetting('referral_settings', DEFAULT_REFERRAL_SETTINGS);
 
     const isEnabled = enabled !== undefined ? enabled : depositEnabled;
     if (isEnabled !== undefined) {
-      referralConfigStore.enabled = Boolean(isEnabled);
-      referralConfigStore.depositEnabled = Boolean(isEnabled);
+      currentSettings.enabled = Boolean(isEnabled);
+      currentSettings.depositEnabled = Boolean(isEnabled);
     }
 
     const inputLevels = levels || depositLevels;
@@ -1057,11 +1087,13 @@ export const updateReferralSettings = async (req, res) => {
         level: Number(d.level),
         percent: parseFloat(d.percent || 0),
       }));
-      referralConfigStore.levels = formattedLevels;
-      referralConfigStore.depositLevels = formattedLevels;
+      currentSettings.levels = formattedLevels;
+      currentSettings.depositLevels = formattedLevels;
     }
 
-    const topComm = referralConfigStore.levels[0]?.percent || 10;
+    await setAdminSetting('referral_settings', currentSettings);
+
+    const topComm = currentSettings.levels[0]?.percent || 10;
     const existing = await prisma.settings.findFirst();
     if (existing) {
       await prisma.settings.update({
@@ -1077,7 +1109,7 @@ export const updateReferralSettings = async (req, res) => {
     return res.json({
       success: true,
       message: 'Referral commission settings updated successfully!',
-      referralSettings: referralConfigStore,
+      referralSettings: currentSettings,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to update referral settings', error: error.message });
@@ -1186,21 +1218,7 @@ export const globalAdminSearch = async (req, res) => {
   }
 };
 
-let generalSettingsStore = {
-  siteTitle: 'EverStake',
-  currency: 'USDT',
-  currencySymbol: '$',
-  timezone: 'UTC',
-  registrationBonus: 10.0,
-  logoUrl: null,
-};
-
-let logoFaviconStore = {
-  logoUrl: null,
-  faviconUrl: null,
-};
-
-export let inMemoryGeneralSettings = {
+const DEFAULT_GENERAL_EXTRA = {
   appDownloadUrl: '/api/app-download',
   registrationBonus: 0.0,
 };
@@ -1217,6 +1235,8 @@ export const getGeneralSettings = async (req, res) => {
       });
     }
 
+    const generalExtra = await getAdminSetting('general_extra_settings', DEFAULT_GENERAL_EXTRA);
+
     return res.json({
       success: true,
       settings: {
@@ -1224,9 +1244,9 @@ export const getGeneralSettings = async (req, res) => {
         currency: settingRecord.currency_name,
         currencySymbol: settingRecord.currency_symbol,
         timezone: 'UTC',
-        registrationBonus: inMemoryGeneralSettings.registrationBonus || 0.0,
+        registrationBonus: parseFloat(generalExtra.registrationBonus || 0.0),
         logoUrl: settingRecord.site_logo,
-        appDownloadUrl: inMemoryGeneralSettings.appDownloadUrl || '/api/app-download',
+        appDownloadUrl: generalExtra.appDownloadUrl || '/api/app-download',
       },
     });
   } catch (error) {
@@ -1238,12 +1258,15 @@ export const updateGeneralSettings = async (req, res) => {
   try {
     const { siteTitle, currency, currencySymbol, logoUrl, appDownloadUrl, registrationBonus } = req.body;
 
-    if (appDownloadUrl) {
-      inMemoryGeneralSettings.appDownloadUrl = appDownloadUrl;
+    const generalExtra = await getAdminSetting('general_extra_settings', DEFAULT_GENERAL_EXTRA);
+
+    if (appDownloadUrl !== undefined) {
+      generalExtra.appDownloadUrl = appDownloadUrl;
     }
     if (registrationBonus !== undefined) {
-      inMemoryGeneralSettings.registrationBonus = parseFloat(registrationBonus || 0);
+      generalExtra.registrationBonus = parseFloat(registrationBonus || 0);
     }
+    await setAdminSetting('general_extra_settings', generalExtra);
 
     let settingRecord = await prisma.settings.findFirst();
     if (!settingRecord) {
@@ -1274,9 +1297,9 @@ export const updateGeneralSettings = async (req, res) => {
         currency: settingRecord.currency_name,
         currencySymbol: settingRecord.currency_symbol,
         timezone: 'UTC',
-        registrationBonus: inMemoryGeneralSettings.registrationBonus || 0.0,
+        registrationBonus: parseFloat(generalExtra.registrationBonus || 0.0),
         logoUrl: settingRecord.site_logo,
-        appDownloadUrl: inMemoryGeneralSettings.appDownloadUrl || '/api/app-download',
+        appDownloadUrl: generalExtra.appDownloadUrl || '/api/app-download',
       },
     });
   } catch (error) {
@@ -1285,9 +1308,10 @@ export const updateGeneralSettings = async (req, res) => {
 };
 
 export const getAppDownloadInfo = async (req, res) => {
+  const generalExtra = await getAdminSetting('general_extra_settings', DEFAULT_GENERAL_EXTRA);
   return res.json({
     success: true,
-    appDownloadUrl: inMemoryGeneralSettings.appDownloadUrl || '/api/app-download',
+    appDownloadUrl: generalExtra.appDownloadUrl || '/api/app-download',
     appName: 'EverStake Mobile App',
     version: 'v2.4.0',
     fileSize: '24.5 MB',
@@ -1380,37 +1404,39 @@ export const updateLogoFaviconSettings = async (req, res) => {
   }
 };
 
-let maintenanceStore = {
-  isMaintenance: false,
-  headline: 'THE SITE IS UNDER MAINTENANCE',
-  descriptionText: "We're just tuning up a few things. We apologize for the inconvenience but the platform is currently undergoing planned maintenance.\nThanks for your patience.",
-  imageUrl: null,
-};
-
 export const getMaintenanceSettings = async (req, res) => {
   try {
-    const s = await prisma.settings.findFirst();
-    if (s) {
-      maintenanceStore.isMaintenance = Boolean(s.is_maintenance);
-      if (s.maintenance_headline) maintenanceStore.headline = s.maintenance_headline;
-      if (s.maintenance_description) maintenanceStore.descriptionText = s.maintenance_description;
-      if (s.maintenance_image) maintenanceStore.imageUrl = s.maintenance_image;
+    let s = await prisma.settings.findFirst();
+    if (!s) {
+      s = await prisma.settings.create({
+        data: {
+          is_maintenance: false,
+          maintenance_headline: 'THE SITE IS UNDER MAINTENANCE',
+          maintenance_description: "We're just tuning up a few things. We apologize for the inconvenience but the platform is currently undergoing planned maintenance.\nThanks for your patience.",
+        },
+      });
     }
-  } catch (e) {}
-  return res.json({ success: true, settings: maintenanceStore });
+    return res.json({
+      success: true,
+      settings: {
+        isMaintenance: Boolean(s.is_maintenance),
+        headline: s.maintenance_headline || 'THE SITE IS UNDER MAINTENANCE',
+        descriptionText: s.maintenance_description || 'Platform undergoing scheduled maintenance.',
+        imageUrl: s.maintenance_image || null,
+      },
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: 'Failed to fetch maintenance settings', error: e.message });
+  }
 };
 
 export const updateMaintenanceSettings = async (req, res) => {
   try {
     const { isMaintenance, headline, descriptionText, imageUrl } = req.body;
-    if (isMaintenance !== undefined) maintenanceStore.isMaintenance = Boolean(isMaintenance);
-    if (headline !== undefined) maintenanceStore.headline = headline;
-    if (descriptionText !== undefined) maintenanceStore.descriptionText = descriptionText;
-    if (imageUrl !== undefined) maintenanceStore.imageUrl = imageUrl;
 
-    const existing = await prisma.settings.findFirst();
+    let existing = await prisma.settings.findFirst();
     if (existing) {
-      await prisma.settings.update({
+      existing = await prisma.settings.update({
         where: { id: existing.id },
         data: {
           is_maintenance: Boolean(isMaintenance),
@@ -1420,7 +1446,7 @@ export const updateMaintenanceSettings = async (req, res) => {
         },
       });
     } else {
-      await prisma.settings.create({
+      existing = await prisma.settings.create({
         data: {
           is_maintenance: Boolean(isMaintenance),
           maintenance_headline: headline || 'System Maintenance Underway',
@@ -1430,40 +1456,53 @@ export const updateMaintenanceSettings = async (req, res) => {
       });
     }
 
-    return res.json({ success: true, message: 'Maintenance mode settings updated successfully!', settings: maintenanceStore });
+    return res.json({
+      success: true,
+      message: 'Maintenance mode settings updated successfully!',
+      settings: {
+        isMaintenance: Boolean(existing.is_maintenance),
+        headline: existing.maintenance_headline,
+        descriptionText: existing.maintenance_description,
+        imageUrl: existing.maintenance_image,
+      },
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to update maintenance settings', error: error.message });
   }
 };
 
-let cookiePolicyStore = {
-  isEnabled: true,
-  shortDescription: 'We may use cookies or any other tracking technologies when you visit our website, including any other media form, mobile website, or mobile application related or connected to help customize the Site and improve your experience.',
-  fullDescription: `What information do we collect?\nWe gather data from you when you register on our site, submit a request, buy any services, react to an overview, or round out a structure.\n\nHow do we protect your information?\nAll provided delicate data is sent through encrypted protocols.\n\nDo we disclose any information to outside parties?\nWe don't sell, exchange, or in any case move to outside gatherings your data.`,
-};
-
 export const getCookiePolicySettings = async (req, res) => {
   try {
-    const s = await prisma.settings.findFirst();
-    if (s) {
-      cookiePolicyStore.isEnabled = Boolean(s.cookie_enabled);
-      if (s.cookie_short_description) cookiePolicyStore.shortDescription = s.cookie_short_description;
-      if (s.cookie_full_description) cookiePolicyStore.fullDescription = s.cookie_full_description;
+    let s = await prisma.settings.findFirst();
+    if (!s) {
+      s = await prisma.settings.create({
+        data: {
+          cookie_enabled: true,
+          cookie_short_description: 'We use cookies to improve your experience.',
+          cookie_full_description: 'We use essential cookies to maintain user session security.',
+        },
+      });
     }
-  } catch (e) {}
-  return res.json({ success: true, settings: cookiePolicyStore });
+    return res.json({
+      success: true,
+      settings: {
+        isEnabled: Boolean(s.cookie_enabled),
+        shortDescription: s.cookie_short_description || '',
+        fullDescription: s.cookie_full_description || '',
+      },
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: 'Failed to fetch cookie policy', error: e.message });
+  }
 };
 
 export const updateCookiePolicySettings = async (req, res) => {
   try {
     const { isEnabled, shortDescription, fullDescription } = req.body;
-    if (isEnabled !== undefined) cookiePolicyStore.isEnabled = Boolean(isEnabled);
-    if (shortDescription !== undefined) cookiePolicyStore.shortDescription = shortDescription;
-    if (fullDescription !== undefined) cookiePolicyStore.fullDescription = fullDescription;
 
-    const existing = await prisma.settings.findFirst();
+    let existing = await prisma.settings.findFirst();
     if (existing) {
-      await prisma.settings.update({
+      existing = await prisma.settings.update({
         where: { id: existing.id },
         data: {
           cookie_enabled: Boolean(isEnabled),
@@ -1472,7 +1511,7 @@ export const updateCookiePolicySettings = async (req, res) => {
         },
       });
     } else {
-      await prisma.settings.create({
+      existing = await prisma.settings.create({
         data: {
           cookie_enabled: Boolean(isEnabled),
           cookie_short_description: shortDescription,
@@ -1481,22 +1520,30 @@ export const updateCookiePolicySettings = async (req, res) => {
       });
     }
 
-    return res.json({ success: true, message: 'GDPR Cookie settings updated successfully!', settings: cookiePolicyStore });
+    return res.json({
+      success: true,
+      message: 'GDPR Cookie settings updated successfully!',
+      settings: {
+        isEnabled: Boolean(existing.cookie_enabled),
+        shortDescription: existing.cookie_short_description,
+        fullDescription: existing.cookie_full_description,
+      },
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to update cookie settings', error: error.message });
   }
 };
 
-let adminVerificationPin = '123456';
-
 export const adminChangeVerificationPassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    if (currentPassword && currentPassword !== adminVerificationPin) {
+    const currentPin = await getAdminSetting('admin_verification_pin', '123456');
+
+    if (currentPassword && String(currentPassword) !== String(currentPin)) {
       return res.status(400).json({ success: false, message: 'Current verification password is incorrect.' });
     }
 
-    adminVerificationPin = String(newPassword);
+    await setAdminSetting('admin_verification_pin', String(newPassword));
     return res.json({ success: true, message: 'Verification security password updated successfully!' });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to update verification password', error: error.message });
@@ -1573,34 +1620,62 @@ export const getAdminNotifications = async (req, res) => {
   }
 };
 
-export let systemFeaturesStore = {
-  giftBonus: true,
-  tasks: true,
-  dailyCheckin: true,
-  spinWheel: true,
-};
-
 export const getSystemFeatures = async (req, res) => {
-  return res.json({
-    success: true,
-    features: systemFeaturesStore,
-  });
+  try {
+    const rows = await prisma.system_feature_toggles.findMany();
+    const map = {
+      giftBonus: true,
+      tasks: true,
+      dailyCheckin: true,
+      spinWheel: true,
+    };
+    rows.forEach((r) => {
+      map[r.key] = r.is_enabled;
+    });
+    return res.json({
+      success: true,
+      features: map,
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Failed to fetch system features', error: err.message });
+  }
 };
 
 export const updateSystemFeatures = async (req, res) => {
   try {
     const { giftBonus, tasks, dailyCheckin, spinWheel, invitationTasks, luckySpin } = req.body;
-    if (giftBonus !== undefined) systemFeaturesStore.giftBonus = Boolean(giftBonus);
-    if (tasks !== undefined) systemFeaturesStore.tasks = Boolean(tasks);
-    if (invitationTasks !== undefined) systemFeaturesStore.tasks = Boolean(invitationTasks);
-    if (dailyCheckin !== undefined) systemFeaturesStore.dailyCheckin = Boolean(dailyCheckin);
-    if (spinWheel !== undefined) systemFeaturesStore.spinWheel = Boolean(spinWheel);
-    if (luckySpin !== undefined) systemFeaturesStore.spinWheel = Boolean(luckySpin);
+
+    const updates = {};
+    if (giftBonus !== undefined) updates.giftBonus = Boolean(giftBonus);
+    if (tasks !== undefined) updates.tasks = Boolean(tasks);
+    if (invitationTasks !== undefined) updates.tasks = Boolean(invitationTasks);
+    if (dailyCheckin !== undefined) updates.dailyCheckin = Boolean(dailyCheckin);
+    if (spinWheel !== undefined) updates.spinWheel = Boolean(spinWheel);
+    if (luckySpin !== undefined) updates.spinWheel = Boolean(luckySpin);
+
+    for (const [k, v] of Object.entries(updates)) {
+      await prisma.system_feature_toggles.upsert({
+        where: { key: k },
+        update: { is_enabled: v },
+        create: { key: k, is_enabled: v },
+      });
+    }
+
+    const rows = await prisma.system_feature_toggles.findMany();
+    const map = {
+      giftBonus: true,
+      tasks: true,
+      dailyCheckin: true,
+      spinWheel: true,
+    };
+    rows.forEach((r) => {
+      map[r.key] = r.is_enabled;
+    });
 
     return res.json({
       success: true,
       message: 'System features updated successfully!',
-      features: systemFeaturesStore,
+      features: map,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to update system features', error: error.message });

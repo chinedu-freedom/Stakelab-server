@@ -31,13 +31,17 @@ export const createDeposit = async (req, res) => {
     }
 
     const depositAmount = parseFloat(amount);
-    const settings = (await prisma.settings.findFirst()) || { min_deposit: 1, max_deposit: 50000 };
+    const settings = (await prisma.settings.findFirst()) || { min_deposit: 1, max_deposit: 50000, deposit_charge: 0 };
     if (depositAmount < parseFloat(settings.min_deposit)) {
       return res.status(400).json({ success: false, message: `Minimum deposit amount is $${settings.min_deposit}` });
     }
     if (depositAmount > parseFloat(settings.max_deposit)) {
       return res.status(400).json({ success: false, message: `Maximum deposit amount is $${settings.max_deposit}` });
     }
+
+    const chargeRate = parseFloat(settings.deposit_charge || 0);
+    const depositCharge = (depositAmount * chargeRate) / 100;
+    const totalRequiredAmount = depositAmount + depositCharge;
 
     const OXAPAY_MERCHANT_KEY = process.env.OXAPAY_MERCHANT_KEY;
     const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5000/api';
@@ -68,7 +72,7 @@ export const createDeposit = async (req, res) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             merchant: OXAPAY_MERCHANT_KEY,
-            amount: depositAmount,
+            amount: totalRequiredAmount,
             payCurrency: payCurrency,
             network: oxapayNetwork,
             feePaidByPayer: 0,
@@ -85,6 +89,8 @@ export const createDeposit = async (req, res) => {
             data: {
               user_id: userId,
               amount: depositAmount,
+              charge: depositCharge,
+              total_amount: totalRequiredAmount,
               payment_method,
               track_id: String(json.trackId),
               status: 'initiated',
@@ -98,6 +104,8 @@ export const createDeposit = async (req, res) => {
             trackId: json.trackId,
             dynamic: true,
             deposit,
+            charge: depositCharge,
+            totalRequired: totalRequiredAmount,
           });
         }
       } catch (oxaErr) {
@@ -110,6 +118,8 @@ export const createDeposit = async (req, res) => {
       data: {
         user_id: userId,
         amount: depositAmount,
+        charge: depositCharge,
+        total_amount: totalRequiredAmount,
         payment_method,
         transaction_hash: transaction_hash || null,
         proof_image: proof_image || null,
@@ -131,6 +141,14 @@ export const createDeposit = async (req, res) => {
               <td style="font-weight: 800; color: #0f172a;">$${depositAmount.toFixed(2)}</td>
             </tr>
             <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td style="font-weight: 700; color: #475569;">Deposit Charge</td>
+              <td style="font-weight: 700; color: #dc2626;">+$${depositCharge.toFixed(2)}</td>
+            </tr>
+            <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+              <td style="font-weight: 700; color: #475569;">Total Payment Required</td>
+              <td style="font-weight: 800; color: #0f172a;">$${totalRequiredAmount.toFixed(2)}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
               <td style="font-weight: 700; color: #475569;">Payment Method</td>
               <td style="color: #0f172a;">${payment_method}</td>
             </tr>
@@ -147,15 +165,17 @@ export const createDeposit = async (req, res) => {
     });
 
     sendAdminNotificationEmail({
-      subject: `New Deposit Request: $${depositAmount.toFixed(2)} USDT from @${req.user.username || req.user.full_name}`,
+      subject: `New Deposit Request: $${depositAmount.toFixed(2)} USDT (Total: $${totalRequiredAmount.toFixed(2)}) from @${req.user.username || req.user.full_name}`,
       title: 'New Deposit Request Submitted',
-      details: `<p>A user submitted a new deposit request:</p><ul><li><b>User:</b> @${req.user.username || req.user.full_name} (${req.user.email})</li><li><b>Amount:</b> $${depositAmount.toFixed(2)} USDT</li><li><b>Payment Method:</b> ${payment_method}</li></ul>`,
+      details: `<p>A user submitted a new deposit request:</p><ul><li><b>User:</b> @${req.user.username || req.user.full_name} (${req.user.email})</li><li><b>Amount to Credit:</b> $${depositAmount.toFixed(2)} USDT</li><li><b>Deposit Charge:</b> $${depositCharge.toFixed(2)}</li><li><b>Total Payment Required:</b> $${totalRequiredAmount.toFixed(2)}</li><li><b>Payment Method:</b> ${payment_method}</li></ul>`,
     }).catch(() => null);
 
     return res.status(201).json({
       success: true,
       message: 'Deposit submitted successfully and pending approval',
       deposit,
+      charge: depositCharge,
+      totalRequired: totalRequiredAmount,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to create deposit', error: error.message });
@@ -209,7 +229,12 @@ export const oxapayWebhook = async (req, res) => {
 
       if (!deposit) {
         deposit = await prisma.deposits.findFirst({
-          where: { amount: paidAmount, status: { in: ['PENDING', 'initiated'] } },
+          where: {
+            OR: [
+              { total_amount: paidAmount, status: { in: ['PENDING', 'initiated'] } },
+              { amount: paidAmount, status: { in: ['PENDING', 'initiated'] } },
+            ],
+          },
         });
       }
 
@@ -219,6 +244,13 @@ export const oxapayWebhook = async (req, res) => {
 
       if (deposit.status === 'APPROVED') {
         return res.status(200).json({ ok: true });
+      }
+
+      // Insufficient Payment Guard: User must pay at least the total_amount (deposit amount + charge)
+      const requiredTotal = Number(deposit.total_amount || deposit.amount);
+      if (paidAmount < requiredTotal) {
+        console.warn(`OXAPAY_UNDERPAID_WARNING: Paid $${paidAmount}, expected total $${requiredTotal}`);
+        return res.status(200).json({ ok: true, message: 'Underpaid transaction, user account not credited' });
       }
 
       const creditAmount = Number(deposit.amount);
