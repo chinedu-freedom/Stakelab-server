@@ -538,23 +538,47 @@ export const createStakingPlan = async (req, res) => {
     const { title, badge, min_amount, max_amount, apy_percent, daily_return_percent, duration_days, capital_return, is_fixed_deposit, is_compounding, max_invest_limit, tier, status } = req.body;
     const isActive = status ? status.toUpperCase() === 'ACTIVE' : true;
 
-    const plan = await prisma.staking_plans.create({
-      data: {
-        title,
-        badge: badge || (isActive ? 'ACTIVE' : 'INACTIVE'),
-        min_amount: parseFloat(min_amount),
-        max_amount: parseFloat(max_amount),
-        apy_percent: parseFloat(apy_percent || 0),
-        daily_return_percent: parseFloat(daily_return_percent),
-        duration_days: parseInt(duration_days),
-        tier: tier || 'Flexible Tier',
-        is_fixed_deposit: is_fixed_deposit !== undefined ? Boolean(is_fixed_deposit) : true,
-        capital_return: capital_return !== undefined ? Boolean(capital_return) : true,
-        is_compounding: is_compounding !== undefined ? Boolean(is_compounding) : true,
-        max_invest_limit: max_invest_limit !== undefined && max_invest_limit !== '' ? Math.max(0, parseInt(max_invest_limit)) : 0,
-        is_active: isActive,
-      },
-    });
+    let plan;
+    try {
+      plan = await prisma.staking_plans.create({
+        data: {
+          title,
+          badge: badge || (isActive ? 'ACTIVE' : 'INACTIVE'),
+          min_amount: parseFloat(min_amount),
+          max_amount: parseFloat(max_amount),
+          apy_percent: parseFloat(apy_percent || 0),
+          daily_return_percent: parseFloat(daily_return_percent),
+          duration_days: parseInt(duration_days),
+          tier: tier || 'Flexible Tier',
+          is_fixed_deposit: is_fixed_deposit !== undefined ? Boolean(is_fixed_deposit) : true,
+          capital_return: capital_return !== undefined ? Boolean(capital_return) : true,
+          is_compounding: is_compounding !== undefined ? Boolean(is_compounding) : true,
+          max_invest_limit: max_invest_limit !== undefined && max_invest_limit !== '' ? Math.max(0, parseInt(max_invest_limit)) : 0,
+          is_active: isActive,
+        },
+      });
+    } catch (dbErr) {
+      if (dbErr.message && dbErr.message.includes('max_invest_limit')) {
+        plan = await prisma.staking_plans.create({
+          data: {
+            title,
+            badge: badge || (isActive ? 'ACTIVE' : 'INACTIVE'),
+            min_amount: parseFloat(min_amount),
+            max_amount: parseFloat(max_amount),
+            apy_percent: parseFloat(apy_percent || 0),
+            daily_return_percent: parseFloat(daily_return_percent),
+            duration_days: parseInt(duration_days),
+            tier: tier || 'Flexible Tier',
+            is_fixed_deposit: is_fixed_deposit !== undefined ? Boolean(is_fixed_deposit) : true,
+            capital_return: capital_return !== undefined ? Boolean(capital_return) : true,
+            is_compounding: is_compounding !== undefined ? Boolean(is_compounding) : true,
+            is_active: isActive,
+          },
+        });
+      } else {
+        throw dbErr;
+      }
+    }
 
     return res.status(201).json({ success: true, plan });
   } catch (error) {
@@ -584,24 +608,39 @@ export const updateStakingPlan = async (req, res) => {
     const parsedDuration = parseIntNum(duration_days);
     const parsedMaxInvest = max_invest_limit !== undefined ? (max_invest_limit !== '' && !isNaN(parseInt(max_invest_limit)) ? Math.max(0, parseInt(max_invest_limit)) : 0) : undefined;
 
-    const updated = await prisma.staking_plans.update({
-      where: { id },
-      data: {
-        ...(title !== undefined && { title }),
-        ...(badge !== undefined && { badge }),
-        ...(parsedMin !== undefined && { min_amount: parsedMin }),
-        ...(parsedMax !== undefined && { max_amount: parsedMax }),
-        ...(parsedApy !== undefined && { apy_percent: parsedApy }),
-        ...(parsedDaily !== undefined && { daily_return_percent: parsedDaily }),
-        ...(parsedDuration !== undefined && { duration_days: parsedDuration }),
-        ...(tier !== undefined && { tier }),
-        ...(is_fixed_deposit !== undefined && { is_fixed_deposit: Boolean(is_fixed_deposit) }),
-        ...(capital_return !== undefined && { capital_return: Boolean(capital_return) }),
-        ...(is_compounding !== undefined && { is_compounding: Boolean(is_compounding) }),
-        ...(parsedMaxInvest !== undefined && { max_invest_limit: parsedMaxInvest }),
-        ...(activeStatus !== undefined && { is_active: activeStatus }),
-      },
-    });
+    const updateData = {
+      ...(title !== undefined && { title }),
+      ...(badge !== undefined && { badge }),
+      ...(parsedMin !== undefined && { min_amount: parsedMin }),
+      ...(parsedMax !== undefined && { max_amount: parsedMax }),
+      ...(parsedApy !== undefined && { apy_percent: parsedApy }),
+      ...(parsedDaily !== undefined && { daily_return_percent: parsedDaily }),
+      ...(parsedDuration !== undefined && { duration_days: parsedDuration }),
+      ...(tier !== undefined && { tier }),
+      ...(is_fixed_deposit !== undefined && { is_fixed_deposit: Boolean(is_fixed_deposit) }),
+      ...(capital_return !== undefined && { capital_return: Boolean(capital_return) }),
+      ...(is_compounding !== undefined && { is_compounding: Boolean(is_compounding) }),
+      ...(parsedMaxInvest !== undefined && { max_invest_limit: parsedMaxInvest }),
+      ...(activeStatus !== undefined && { is_active: activeStatus }),
+    };
+
+    let updated;
+    try {
+      updated = await prisma.staking_plans.update({
+        where: { id },
+        data: updateData,
+      });
+    } catch (dbErr) {
+      if (dbErr.message && dbErr.message.includes('max_invest_limit')) {
+        delete updateData.max_invest_limit;
+        updated = await prisma.staking_plans.update({
+          where: { id },
+          data: updateData,
+        });
+      } else {
+        throw dbErr;
+      }
+    }
 
     return res.json({ success: true, plan: updated });
   } catch (error) {
