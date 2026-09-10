@@ -23,6 +23,7 @@ export const getUserDashboardData = async (req, res) => {
         zip_code: true,
         city: true,
         profile_complete: true,
+        email_verified: true,
         created_at: true,
       },
     });

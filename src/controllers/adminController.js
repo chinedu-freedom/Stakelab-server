@@ -676,7 +676,8 @@ export const updateUserBalance = async (req, res) => {
     }
 
     if (admin_password) {
-      if (String(admin_password).trim() !== adminVerificationPin) {
+      const currentPin = await getAdminSetting('admin_verification_pin', '123456');
+      if (String(admin_password).trim() !== String(currentPin).trim()) {
         return res.status(400).json({ success: false, message: 'Invalid Admin Security Verification Password' });
       }
     }

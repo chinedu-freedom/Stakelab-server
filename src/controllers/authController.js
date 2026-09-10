@@ -300,6 +300,7 @@ export const login = async (req, res) => {
         zip_code: user.zip_code,
         city: user.city,
         profile_complete: user.profile_complete,
+        email_verified: user.email_verified,
       },
     });
   } catch (error) {
