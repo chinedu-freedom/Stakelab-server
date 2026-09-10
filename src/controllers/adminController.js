@@ -567,30 +567,46 @@ export const updateStakingPlan = async (req, res) => {
     const { id } = req.params;
     const { title, badge, min_amount, max_amount, apy_percent, daily_return_percent, duration_days, capital_return, is_fixed_deposit, is_compounding, max_invest_limit, tier, is_active, status } = req.body;
 
+    const existing = await prisma.staking_plans.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Staking plan not found' });
+    }
+
     const activeStatus = is_active !== undefined ? Boolean(is_active) : (status ? status.toUpperCase() === 'ACTIVE' : undefined);
+
+    const parseNum = (val) => (val !== undefined && val !== null && val !== '' && !isNaN(parseFloat(val)) ? parseFloat(val) : undefined);
+    const parseIntNum = (val) => (val !== undefined && val !== null && val !== '' && !isNaN(parseInt(val)) ? Math.max(0, parseInt(val)) : undefined);
+
+    const parsedMin = parseNum(min_amount);
+    const parsedMax = parseNum(max_amount);
+    const parsedApy = parseNum(apy_percent);
+    const parsedDaily = parseNum(daily_return_percent);
+    const parsedDuration = parseIntNum(duration_days);
+    const parsedMaxInvest = max_invest_limit !== undefined ? (max_invest_limit !== '' && !isNaN(parseInt(max_invest_limit)) ? Math.max(0, parseInt(max_invest_limit)) : 0) : undefined;
 
     const updated = await prisma.staking_plans.update({
       where: { id },
       data: {
         ...(title !== undefined && { title }),
         ...(badge !== undefined && { badge }),
-        ...(min_amount !== undefined && { min_amount: parseFloat(min_amount) }),
-        ...(max_amount !== undefined && { max_amount: parseFloat(max_amount) }),
-        ...(apy_percent !== undefined && { apy_percent: parseFloat(apy_percent) }),
-        ...(daily_return_percent !== undefined && { daily_return_percent: parseFloat(daily_return_percent) }),
-        ...(duration_days !== undefined && { duration_days: parseInt(duration_days) }),
+        ...(parsedMin !== undefined && { min_amount: parsedMin }),
+        ...(parsedMax !== undefined && { max_amount: parsedMax }),
+        ...(parsedApy !== undefined && { apy_percent: parsedApy }),
+        ...(parsedDaily !== undefined && { daily_return_percent: parsedDaily }),
+        ...(parsedDuration !== undefined && { duration_days: parsedDuration }),
         ...(tier !== undefined && { tier }),
         ...(is_fixed_deposit !== undefined && { is_fixed_deposit: Boolean(is_fixed_deposit) }),
         ...(capital_return !== undefined && { capital_return: Boolean(capital_return) }),
         ...(is_compounding !== undefined && { is_compounding: Boolean(is_compounding) }),
-        ...(max_invest_limit !== undefined && { max_invest_limit: max_invest_limit !== '' ? Math.max(0, parseInt(max_invest_limit)) : 0 }),
+        ...(parsedMaxInvest !== undefined && { max_invest_limit: parsedMaxInvest }),
         ...(activeStatus !== undefined && { is_active: activeStatus }),
       },
     });
 
     return res.json({ success: true, plan: updated });
   } catch (error) {
-    return res.status(500).json({ success: false, message: 'Failed to update plan', error: error.message });
+    console.error('Update plan error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update plan: ' + error.message, error: error.message });
   }
 };
 
