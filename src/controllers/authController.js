@@ -195,7 +195,7 @@ export const register = async (req, res) => {
 
     const token = jwt.sign(
       { userId: user.id, email: user.email },
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET || 'stakelab_jwt_secret_key_2026',
       { expiresIn: '1d' }
     );
 
@@ -276,7 +276,7 @@ export const login = async (req, res) => {
     const isRemember = Boolean(remember_me || rememberMe || remember);
     const token = jwt.sign(
       { userId: user.id, email: user.email },
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET || 'stakelab_jwt_secret_key_2026',
       { expiresIn: isRemember ? '1d' : '1h' }
     );
 
@@ -332,7 +332,7 @@ export const adminLogin = async (req, res) => {
     const isRemember = Boolean(remember_me || rememberMe || remember);
     const token = jwt.sign(
       { adminId: admin.id, email: admin.email, role: admin.role },
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET || 'stakelab_jwt_secret_key_2026',
       { expiresIn: isRemember ? '1d' : '1h' }
     );
 
