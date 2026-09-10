@@ -1,3 +1,4 @@
+import jwt from 'jsonwebtoken';
 import { prisma } from '../config/db.js';
 import { sendEmail, sendAdminNotificationEmail, sendStakeActivatedEmail, sendStakeCompletedEmail } from '../services/emailService.js';
 import { processReferralCommissions } from './adminController.js';
@@ -7,7 +8,37 @@ export const getStakingPlans = async (req, res) => {
     const plans = await prisma.staking_plans.findMany({
       orderBy: { sort_order: 'asc' },
     });
-    return res.json({ success: true, plans });
+
+    let userId = req.user?.id;
+    if (!userId) {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        try {
+          const token = authHeader.split(' ')[1];
+          const decoded = jwt.verify(token, process.env.JWT_SECRET || 'stakelab_super_secret_jwt_key_2026_change_in_production');
+          if (decoded && decoded.userId) userId = decoded.userId;
+        } catch (e) {}
+      }
+    }
+
+    let userStakeCounts = {};
+    if (userId) {
+      const userStakes = await prisma.user_stakes.groupBy({
+        by: ['plan_id'],
+        where: { user_id: userId },
+        _count: { id: true },
+      });
+      userStakes.forEach((item) => {
+        userStakeCounts[item.plan_id] = item._count.id;
+      });
+    }
+
+    const plansWithCounts = plans.map((p) => ({
+      ...p,
+      user_stake_count: userStakeCounts[p.id] || 0,
+    }));
+
+    return res.json({ success: true, plans: plansWithCounts });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to fetch staking plans', error: error.message });
   }
@@ -46,6 +77,19 @@ export const createStake = async (req, res) => {
     const isPlanUnavailable = !plan.is_active || rawSt === 'UNAVAILABLE' || rawSt === 'INACTIVE';
     if (isPlanUnavailable) {
       return res.status(400).json({ success: false, message: 'This staking plan is currently unavailable for purchase.' });
+    }
+
+    // Check maximum investment limit per user for this plan
+    if (plan.max_invest_limit && plan.max_invest_limit > 0) {
+      const existingStakeCount = await prisma.user_stakes.count({
+        where: { user_id: userId, plan_id: plan.id },
+      });
+      if (existingStakeCount >= plan.max_invest_limit) {
+        return res.status(400).json({
+          success: false,
+          message: 'You have reached the maximum allowed investments for this plan.',
+        });
+      }
     }
 
     // Prerequisite Check: User must have an investment in Flexible Tier before investing in Dynamic Tier

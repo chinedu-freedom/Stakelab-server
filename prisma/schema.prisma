@@ -86,6 +86,7 @@ model staking_plans {
   is_fixed_deposit     Boolean      @default(true)
   capital_return       Boolean      @default(true)
   is_compounding       Boolean      @default(true)
+  max_invest_limit     Int?         @default(0) // 0 or null means unlimited
   is_active            Boolean      @default(true)
   sort_order           Int          @default(0)
   created_at           DateTime     @default(now())

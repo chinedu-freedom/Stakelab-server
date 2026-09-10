@@ -535,7 +535,7 @@ export const getAllStakingPlans = async (req, res) => {
 
 export const createStakingPlan = async (req, res) => {
   try {
-    const { title, badge, min_amount, max_amount, apy_percent, daily_return_percent, duration_days, capital_return, is_fixed_deposit, is_compounding, tier, status } = req.body;
+    const { title, badge, min_amount, max_amount, apy_percent, daily_return_percent, duration_days, capital_return, is_fixed_deposit, is_compounding, max_invest_limit, tier, status } = req.body;
     const isActive = status ? status.toUpperCase() === 'ACTIVE' : true;
 
     const plan = await prisma.staking_plans.create({
@@ -551,6 +551,7 @@ export const createStakingPlan = async (req, res) => {
         is_fixed_deposit: is_fixed_deposit !== undefined ? Boolean(is_fixed_deposit) : true,
         capital_return: capital_return !== undefined ? Boolean(capital_return) : true,
         is_compounding: is_compounding !== undefined ? Boolean(is_compounding) : true,
+        max_invest_limit: max_invest_limit !== undefined && max_invest_limit !== '' ? Math.max(0, parseInt(max_invest_limit)) : 0,
         is_active: isActive,
       },
     });
@@ -564,7 +565,7 @@ export const createStakingPlan = async (req, res) => {
 export const updateStakingPlan = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, badge, min_amount, max_amount, apy_percent, daily_return_percent, duration_days, capital_return, is_fixed_deposit, is_compounding, tier, is_active, status } = req.body;
+    const { title, badge, min_amount, max_amount, apy_percent, daily_return_percent, duration_days, capital_return, is_fixed_deposit, is_compounding, max_invest_limit, tier, is_active, status } = req.body;
 
     const activeStatus = is_active !== undefined ? Boolean(is_active) : (status ? status.toUpperCase() === 'ACTIVE' : undefined);
 
@@ -582,6 +583,7 @@ export const updateStakingPlan = async (req, res) => {
         ...(is_fixed_deposit !== undefined && { is_fixed_deposit: Boolean(is_fixed_deposit) }),
         ...(capital_return !== undefined && { capital_return: Boolean(capital_return) }),
         ...(is_compounding !== undefined && { is_compounding: Boolean(is_compounding) }),
+        ...(max_invest_limit !== undefined && { max_invest_limit: max_invest_limit !== '' ? Math.max(0, parseInt(max_invest_limit)) : 0 }),
         ...(activeStatus !== undefined && { is_active: activeStatus }),
       },
     });
