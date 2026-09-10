@@ -41,12 +41,16 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, async () => {
   console.log(`🚀 Stakelab Backend API running on http://localhost:${PORT}`);
-  await seedDefaultStakingPlans();
-  await cleanupDuplicateStakingPlans();
+  try {
+    await seedDefaultStakingPlans();
+    await cleanupDuplicateStakingPlans();
+  } catch (err) {
+    console.error('Startup seed error:', err.message);
+  }
   
   // Background runner: Process daily yields & maturity payouts on startup & every 1 hour
-  processStakingYields().catch(() => null);
+  processStakingYields().catch((err) => console.error('Yield runner error:', err.message));
   setInterval(() => {
-    processStakingYields().catch(() => null);
+    processStakingYields().catch((err) => console.error('Yield runner error:', err.message));
   }, 60 * 60 * 1000);
 });
