@@ -558,7 +558,7 @@ export const sendStakeCompletedEmail = async ({ user, stake, plan, totalProfit =
             <td style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); padding:32px 35px; text-align:center;">
               <h1 style="color:#ffffff; margin:0; font-size:24px; font-weight:800; letter-spacing:1px;">${siteName}</h1>
               <span style="display:inline-block; background:#ffffff; color:#059669; font-size:11px; font-weight:800; padding:4px 14px; border-radius:20px; text-transform:uppercase; margin-top:8px; letter-spacing:1px;">
-                Plan Completed
+                Staking Completed
               </span>
             </td>
           </tr>
@@ -570,7 +570,7 @@ export const sendStakeCompletedEmail = async ({ user, stake, plan, totalProfit =
                 Congratulations ${user.full_name || user.username || 'Valued Staker'}! 🎉
               </h2>
               <p style="font-size:15px; line-height:1.6; color:#475569; margin-top:12px;">
-                Your staking investment in <strong>${plan.title}</strong> has officially reached maturity and is now <strong>COMPLETED</strong>. All profits and principal capital have been credited to your account balance.
+                Your staking investment under the <strong>“${plan.title}”</strong> has reached maturity successfully. Your principal and earned profits have been credited to your account balance.
               </p>
 
               <!-- RESPONSIVE PLAN COMPLETION TABLE -->
@@ -614,7 +614,7 @@ export const sendStakeCompletedEmail = async ({ user, stake, plan, totalProfit =
 
               <!-- Action Button -->
               <div style="text-align:center; margin:30px 0 20px 0;">
-                <a href="${frontendUrl}/plans" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); color:#ffffff; text-decoration:none; padding:14px 36px; border-radius:50px; font-size:15px; font-weight:800; display:inline-block; box-shadow:0 4px 18px rgba(5,150,105,0.3); text-transform:uppercase;">
+                <a href="${frontendUrl}/staking/create" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); color:#ffffff; text-decoration:none; padding:14px 36px; border-radius:50px; font-size:15px; font-weight:800; display:inline-block; box-shadow:0 4px 18px rgba(5,150,105,0.3); text-transform:uppercase;">
                   Re-invest & Grow More
                 </a>
               </div>
