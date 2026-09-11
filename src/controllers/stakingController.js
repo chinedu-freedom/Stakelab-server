@@ -15,7 +15,7 @@ export const getStakingPlans = async (req, res) => {
       if (authHeader && authHeader.startsWith('Bearer ')) {
         try {
           const token = authHeader.split(' ')[1];
-          const decoded = jwt.verify(token, process.env.JWT_SECRET || 'stakelab_jwt_secret_key_2026');
+          const decoded = jwt.verify(token, process.env.JWT_SECRET || 'stakelab_super_secret_jwt_key_2026_change_in_production');
           if (decoded && decoded.userId) userId = decoded.userId;
         } catch (e) {}
       }
