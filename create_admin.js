@@ -2,8 +2,8 @@ import bcrypt from 'bcryptjs';
 import { prisma } from './src/config/db.js';
 
 async function main() {
-  const email = 'admin@everstake.cx';
-  const plainPassword = 'EverStake.cx2$';
+  const email = process.env.ADMIN_EMAIL || 'admin@everstake.cx';
+  const plainPassword = process.env.ADMIN_PASSWORD || 'EverStake.cx2$';
   const passwordHash = await bcrypt.hash(plainPassword, 10);
 
   const admin = await prisma.admins.upsert({

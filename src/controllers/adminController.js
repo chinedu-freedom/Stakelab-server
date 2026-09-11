@@ -942,7 +942,7 @@ export const impersonateUser = async (req, res) => {
 
     const token = jwt.sign(
       { userId: user.id, email: user.email },
-      process.env.JWT_SECRET || 'stakelab_super_secret_jwt_key_2026_change_in_production',
+      process.env.JWT_SECRET || 'stakelab_jwt_secret_key_2026',
       { expiresIn: '1h' }
     );
     return res.json({

@@ -9,7 +9,7 @@ export const authenticateUser = async (req, res, next) => {
     }
 
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'stakelab_super_secret_jwt_key_2026_change_in_production');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'stakelab_jwt_secret_key_2026');
 
     const user = await prisma.users.findUnique({
       where: { id: decoded.userId },
@@ -54,7 +54,7 @@ export const authenticateAdmin = async (req, res, next) => {
     }
 
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'stakelab_super_secret_admin_jwt_key_2026');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'stakelab_jwt_secret_key_2026');
 
     const admin = await prisma.admins.findUnique({
       where: { id: decoded.adminId },

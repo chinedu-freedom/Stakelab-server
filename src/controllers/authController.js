@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../config/db.js';
 import { sendEmail, sendAdminNotificationEmail, sendFreeSpinRewardEmail } from '../services/emailService.js';
 
-const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY || '6LffwZUtAAAAALsM0OkIFctHSBITmbn7AZLg3caC';
+const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY || '';
 
 async function verifyRecaptcha(token, remoteip) {
   if (!token) return true;
@@ -195,7 +195,7 @@ export const register = async (req, res) => {
 
     const token = jwt.sign(
       { userId: user.id, email: user.email },
-      process.env.JWT_SECRET || 'stakelab_super_secret_jwt_key_2026_change_in_production',
+      process.env.JWT_SECRET || 'stakelab_jwt_secret_key_2026',
       { expiresIn: '1d' }
     );
 
@@ -276,7 +276,7 @@ export const login = async (req, res) => {
     const isRemember = Boolean(remember_me || rememberMe || remember);
     const token = jwt.sign(
       { userId: user.id, email: user.email },
-      process.env.JWT_SECRET || 'stakelab_super_secret_jwt_key_2026_change_in_production',
+      process.env.JWT_SECRET || 'stakelab_jwt_secret_key_2026',
       { expiresIn: isRemember ? '1d' : '1h' }
     );
 
@@ -332,7 +332,7 @@ export const adminLogin = async (req, res) => {
     const isRemember = Boolean(remember_me || rememberMe || remember);
     const token = jwt.sign(
       { adminId: admin.id, email: admin.email, role: admin.role },
-      process.env.JWT_SECRET || 'stakelab_super_secret_admin_jwt_key_2026',
+      process.env.JWT_SECRET || 'stakelab_jwt_secret_key_2026',
       { expiresIn: isRemember ? '1d' : '1h' }
     );
 

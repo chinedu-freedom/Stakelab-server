@@ -44,7 +44,7 @@ export const createDeposit = async (req, res) => {
     const totalRequiredAmount = depositAmount + depositCharge;
 
     const OXAPAY_MERCHANT_KEY = process.env.OXAPAY_MERCHANT_KEY;
-    const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5000/api';
+    const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3001/api';
 
     // If OxaPay Merchant Key is configured, generate dynamic crypto deposit address
     if (OXAPAY_MERCHANT_KEY) {
