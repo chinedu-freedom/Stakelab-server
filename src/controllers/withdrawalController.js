@@ -18,15 +18,15 @@ export const createWithdrawal = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Amount, method, and wallet address are required' });
     }
 
-    // Require active investment package to process withdrawal
-    const activeStake = await prisma.user_stakes.findFirst({
-      where: { user_id: userId, status: 'ACTIVE' },
+    // Require at least one investment package to process withdrawal
+    const hasInvested = await prisma.user_stakes.findFirst({
+      where: { user_id: userId },
     });
 
-    if (!activeStake) {
+    if (!hasInvested) {
       return res.status(400).json({
         success: false,
-        message: 'Withdrawal Failed! An active investment is required to process withdrawals. Kindly activate one and try again.',
+        message: 'Withdrawal Failed! You must have invested in at least one plan before performing withdrawals. Kindly invest in a plan and try again.',
       });
     }
 
