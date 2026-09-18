@@ -252,7 +252,16 @@ export async function processStakingYields(targetUserId = null) {
 
         if (elapsedDays > 0) {
           const dailyProfitRate = dailyReturnPercent / 100;
-          const totalYieldForPeriod = amount * dailyProfitRate * elapsedDays;
+          let totalYieldForPeriod = 0;
+
+          if (isCompounding) {
+            const previousAccumulatedProfit = parseFloat(stake.total_earned || 0);
+            const currentBase = amount + previousAccumulatedProfit;
+            const compoundedValue = currentBase * Math.pow(1 + dailyProfitRate, elapsedDays);
+            totalYieldForPeriod = compoundedValue - currentBase;
+          } else {
+            totalYieldForPeriod = amount * dailyProfitRate * elapsedDays;
+          }
 
           const oldStakedBal = parseFloat(user.staked_balance || 0);
           const oldTotalEarned = parseFloat(user.total_earned || 0);
