@@ -263,8 +263,9 @@ export async function processStakingYields(targetUserId = null) {
             totalYieldForPeriod = amount * dailyProfitRate * elapsedDays;
           }
 
-          const oldStakedBal = parseFloat(user.staked_balance || 0);
-          const oldTotalEarned = parseFloat(user.total_earned || 0);
+          const freshUser = await prisma.users.findUnique({ where: { id: user.id } });
+          const oldStakedBal = parseFloat(freshUser?.staked_balance || 0);
+          const oldTotalEarned = parseFloat(freshUser?.total_earned || 0);
           const newStakedBal = oldStakedBal + totalYieldForPeriod;
           const newTotalEarned = oldTotalEarned + totalYieldForPeriod;
 
