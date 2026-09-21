@@ -175,12 +175,12 @@ export const getPublicRecentActivity = async (req, res) => {
       success: true,
       deposits: deposits.map((d) => ({
         gateway: d.payment_method || 'USDT BEP20',
-        date: new Date(d.created_at).toLocaleString(),
+        date: new Date(d.created_at).toLocaleString('en-US', { hour12: true }),
         amount: `₮${parseFloat(d.amount).toFixed(2)}`,
       })),
       withdrawals: withdrawals.map((w) => ({
         gateway: w.withdrawal_method || 'USDT BEP20',
-        date: new Date(w.created_at).toLocaleString(),
+        date: new Date(w.created_at).toLocaleString('en-US', { hour12: true }),
         amount: `₮${parseFloat(w.amount).toFixed(2)}`,
       })),
     });
