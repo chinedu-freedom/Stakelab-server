@@ -69,6 +69,29 @@ export const createWithdrawal = async (req, res) => {
 
     const walletLabel = selectedWallet === 'profit' ? 'Profits Wallet' : 'Staking Wallet';
 
+    let remainingToDeduct = withdrawAmount;
+    const stakeUpdates = [];
+    if (selectedWallet === 'profit') {
+      const activeStakes = await prisma.user_stakes.findMany({
+        where: { user_id: userId, status: 'ACTIVE' },
+        orderBy: { created_at: 'asc' }
+      });
+      for (const stake of activeStakes) {
+        if (remainingToDeduct <= 0) break;
+        const currentEarned = parseFloat(stake.total_earned || 0);
+        if (currentEarned > 0) {
+          const deduction = Math.min(currentEarned, remainingToDeduct);
+          stakeUpdates.push(
+            prisma.user_stakes.update({
+              where: { id: stake.id },
+              data: { total_earned: currentEarned - deduction }
+            })
+          );
+          remainingToDeduct -= deduction;
+        }
+      }
+    }
+
     const [withdrawal, updatedUser] = await prisma.$transaction([
       prisma.withdrawals.create({
         data: {
@@ -95,6 +118,7 @@ export const createWithdrawal = async (req, res) => {
           description: `Withdrawal request of $${withdrawAmount} from ${walletLabel} to ${wallet_address}`,
         },
       }),
+      ...stakeUpdates,
     ]);
 
     sendEmail({

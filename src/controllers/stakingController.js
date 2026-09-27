@@ -150,6 +150,29 @@ export const createStake = async (req, res) => {
     const newBalance = wallet_type === 'main' ? parseFloat(user.balance || 0) - stakeAmount : parseFloat(user.balance || 0);
     const newStaked = wallet_type === 'profit' ? parseFloat(user.staked_balance || 0) - stakeAmount : parseFloat(user.staked_balance || 0);
 
+    let remainingToDeduct = stakeAmount;
+    const stakeUpdates = [];
+    if (wallet_type === 'profit') {
+      const activeStakes = await prisma.user_stakes.findMany({
+        where: { user_id: userId, status: 'ACTIVE' },
+        orderBy: { created_at: 'asc' }
+      });
+      for (const stake of activeStakes) {
+        if (remainingToDeduct <= 0) break;
+        const currentEarned = parseFloat(stake.total_earned || 0);
+        if (currentEarned > 0) {
+          const deduction = Math.min(currentEarned, remainingToDeduct);
+          stakeUpdates.push(
+            prisma.user_stakes.update({
+              where: { id: stake.id },
+              data: { total_earned: currentEarned - deduction }
+            })
+          );
+          remainingToDeduct -= deduction;
+        }
+      }
+    }
+
     const [stake, updatedUser, tx] = await prisma.$transaction([
       prisma.user_stakes.create({
         data: {
@@ -179,6 +202,7 @@ export const createStake = async (req, res) => {
           description: `Staked $${stakeAmount} into ${plan.title} using ${wallet_type === 'profit' ? 'Profit Wallet' : 'Main Wallet'}`,
         },
       }),
+      ...stakeUpdates,
     ]);
 
     // Referral Commission Logic (Dynamic Admin Configured)
